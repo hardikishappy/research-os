@@ -35,7 +35,13 @@ from research_os.manuscript.latex_ast import (
 )
 from research_os.manuscript.visualizer import PublicationVisualizer
 from research_os.schemas.base import ArtifactBaseModel
-from research_os.schemas.evaluation import EvaluationReport, HypothesisVerdict
+from research_os.schemas.evaluation import (
+    EvaluationReport,
+    HypothesisVerdict,
+    ReplicationStatus,
+    StatisticalSupport,
+    ThresholdStatus,
+)
 from research_os.schemas.experiment import ExperimentSpec
 from research_os.schemas.hypothesis import HypothesisProposal
 from research_os.schemas.paper import PaperMetadata
@@ -576,8 +582,61 @@ class ManuscriptCompiler:
         synthesis: Optional[CrossPaperSynthesis] = None,
         papers: Optional[list[PaperMetadata]] = None,
         grid_evaluation: Optional[Union[dict, Path, str]] = None,
+        execution_manifest: Optional[Union[dict, Path, str]] = None,
     ) -> ManuscriptBundle:
         """Compile a complete research paper to Markdown, LaTeX, and BibTeX."""
+        # Task 3: Decouple manuscript compilation from pre-registered spec.json
+        # Consume verified_execution_manifest.json as single source of truth
+        manifest_data = None
+        if execution_manifest is not None:
+            if isinstance(execution_manifest, dict):
+                manifest_data = execution_manifest
+            else:
+                p_m = Path(execution_manifest)
+                if p_m.exists():
+                    try:
+                        manifest_data = json.loads(p_m.read_text(encoding="utf-8"))
+                    except Exception:
+                        pass
+        else:
+            candidates = [
+                self.output_dir.parent / "verified_execution_manifest.json",
+                self.output_dir / "verified_execution_manifest.json",
+                Path("experiments/runs") / self.run_id / "verified_execution_manifest.json",
+            ]
+            for cand in candidates:
+                if cand.exists():
+                    try:
+                        manifest_data = json.loads(cand.read_text(encoding="utf-8"))
+                        break
+                    except Exception:
+                        pass
+
+        if manifest_data:
+            requested_seeds = manifest_data.get("requested_seeds") or manifest_data.get("random_seeds") or (spec.random_seeds if spec else [])
+            successful_seeds = manifest_data.get("successful_seeds") or [s.seed for s in evaluation.seed_runs if s.exit_code == 0]
+            failed_seeds = manifest_data.get("failed_seeds") or [s.seed for s in evaluation.seed_runs if s.exit_code != 0]
+        else:
+            requested_seeds = spec.random_seeds if spec else []
+            successful_seeds = [s.seed for s in evaluation.seed_runs if s.exit_code == 0]
+            failed_seeds = [s.seed for s in evaluation.seed_runs if s.exit_code != 0]
+
+        n_completed = len(successful_seeds)
+        n_requested = len(requested_seeds) if requested_seeds else evaluation.total_runs
+
+        # If completed seeds N < 2, automatically suppress statistical significance claims.
+        if n_completed < 2:
+            for agg in evaluation.metric_aggregates.values():
+                agg.significance_claim_allowed = False
+                agg.p_value_estimate = None
+                if agg.statistical_analysis:
+                    agg.statistical_analysis.significance_claim_allowed = False
+                    agg.statistical_analysis.p_value = None
+            if hasattr(evaluation, "statistical_support"):
+                evaluation.statistical_support = StatisticalSupport.INSUFFICIENT
+            if hasattr(evaluation, "replication_status"):
+                evaluation.replication_status = ReplicationStatus.SINGLE_POINT
+
         resolved_papers = self.retrieve_related_literature(hypothesis=hypothesis, spec=spec, papers=papers)
         papers_map: dict[str, PaperMetadata] = {}
         for p in resolved_papers:
@@ -666,6 +725,10 @@ class ManuscriptCompiler:
             citation_keys=citation_keys,
             papers_map=papers_map,
             figure_paths=fig_rel_paths,
+            successful_seeds=successful_seeds,
+            requested_seeds=requested_seeds,
+            n_completed=n_completed,
+            n_requested=n_requested,
         )
 
         tex_text = self._build_latex(
@@ -677,6 +740,10 @@ class ManuscriptCompiler:
             citation_keys=citation_keys,
             papers_map=papers_map,
             figures=figures,
+            successful_seeds=successful_seeds,
+            requested_seeds=requested_seeds,
+            n_completed=n_completed,
+            n_requested=n_requested,
         )
 
         # Directive 4: Resolve symbolic evidence claims and enforce compile-time numerical consistency
@@ -723,6 +790,10 @@ class ManuscriptCompiler:
         citation_keys: dict[str, str],
         papers_map: dict[str, PaperMetadata],
         figure_paths: list[str],
+        successful_seeds: Optional[list[int]] = None,
+        requested_seeds: Optional[list[int]] = None,
+        n_completed: Optional[int] = None,
+        n_requested: Optional[int] = None,
     ) -> str:
         """Construct academic paper in GitHub-flavored Markdown."""
         exp_class = spec.experiment_class
@@ -737,6 +808,11 @@ class ManuscriptCompiler:
         )
         verdict_type = "computational verdict" if exp_class != ExperimentClass.EMPIRICAL else "empirical verdict"
 
+        if n_completed is None:
+            n_completed = len(successful_seeds) if successful_seeds is not None else evaluation.successful_runs
+        if n_requested is None:
+            n_requested = len(requested_seeds) if requested_seeds is not None else len(spec.random_seeds)
+
         lines: list[str] = []
         lines.append(f"# {title}\n")
         lines.append("**Authors:** Research OS Autonomous Scientific Engine  ")
@@ -749,8 +825,8 @@ class ManuscriptCompiler:
             f"We present an automated {study_type} investigating the hypothesis that "
             f"*{hypothesis.falsifiable_statement}*. Addressing documented scientific gaps in baseline "
             f"{hypothesis.baseline_method}, we formalize and test the integration of {hypothesis.proposed_mechanism}. "
-            f"Under a multi-seed protocol ({len(spec.random_seeds)} stochastic seeds evaluated under "
-            f"benchmark operationalization), the experimental data produced a {verdict_type} of "
+            f"Under a multi-seed protocol (Evaluated across N_completed = {n_completed} verified runs "
+            f"(out of {n_requested} requested)), the experimental data produced a {verdict_type} of "
             f"**{evaluation.verdict.value}** for target metric `{evaluation.target_metric}`. "
             f"{evaluation.summary_rationale} All execution telemetry, random seeds, and metric derivations are fully preserved "
             f"for deterministic verification."
@@ -820,23 +896,41 @@ class ManuscriptCompiler:
         # Evaluation Section
         sec_name = "Empirical Evaluation" if exp_class == ExperimentClass.EMPIRICAL else "Experimental Evaluation"
         lines.append(f"## 4. {sec_name}\n")
-        lines.append(f"The multi-seed evaluation executed {evaluation.total_runs} seed trials ({evaluation.successful_runs} successful, {evaluation.failed_runs} failed).\n")
-        lines.append("| Metric Name | Mean ($M$) | Std Dev ($SD$) | Std Err ($SE$) | Target Condition | Passed | $p$-value |")
-        lines.append("| :--- | :--- | :--- | :--- | :--- | :--- | :--- |")
+        lines.append(f"The multi-seed evaluation executed {evaluation.total_runs} seed trials ({evaluation.successful_runs} successful, {evaluation.failed_runs} failed). Evaluated across N_completed = {n_completed} verified runs (out of {n_requested} requested).\n")
+        lines.append("| Metric Name | Mean ($M$) | Std Dev ($SD$) | Std Err ($SE$) | Target Condition | Passed | $p$-value | Threshold | Stat. Support | Replication |")
+        lines.append("| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |")
         has_zero_var = False
+        t_val = getattr(evaluation, "threshold_status", None)
+        s_val = getattr(evaluation, "statistical_support", None)
+        r_val = getattr(evaluation, "replication_status", None)
+        t_str = t_val.value if hasattr(t_val, "value") else (str(t_val) if t_val else "N/A")
+        s_str = s_val.value if hasattr(s_val, "value") else (str(s_val) if s_val else "N/A")
+        r_str = r_val.value if hasattr(r_val, "value") else (str(r_val) if r_val else "N/A")
+        if n_completed < 2:
+            s_str = "INSUFFICIENT"
+            r_str = "SINGLE_POINT"
+
         for m_name, agg in evaluation.metric_aggregates.items():
-            if len(agg.sample_values) > 1 and agg.std_dev == 0.0:
+            if n_completed < 2:
+                p_val = "N/A"
+            elif len(agg.sample_values) > 1 and agg.std_dev == 0.0:
                 p_val = "N/A*"
                 has_zero_var = True
-            elif evaluation.total_runs < 2:
-                p_val = "N/A"
-            elif agg.p_value_estimate is not None:
+            elif agg.p_value_estimate is not None and getattr(agg, "significance_claim_allowed", True):
                 p_val = f"{agg.p_value_estimate:.4f}"
             else:
                 p_val = "N/A"
             cond = f"{agg.operator} {agg.target_threshold}"
-            lines.append(f"| `{m_name}` | {agg.mean:.4f} | {agg.std_dev:.4f} | {agg.std_err:.4f} | {cond} | {'Yes' if agg.passed else 'No'} | {p_val} |")
+            lines.append(f"| `{m_name}` | {agg.mean:.4f} | {agg.std_dev:.4f} | {agg.std_err:.4f} | {cond} | {'Yes' if agg.passed else 'No'} | {p_val} | {t_str} | {s_str} | {r_str} |")
         lines.append("")
+        if has_zero_var:
+            lines.append(r"\* *Identical outputs observed across seeds ($SD = 0.0000$); null hypothesis significance testing uninformative.*" + "\n")
+
+        lines.append("### Decoupled Scientific Evaluation Verdicts\n")
+        lines.append(f"- **Threshold Status:** `{t_str}`")
+        lines.append(f"- **Statistical Support:** `{s_str}`")
+        lines.append(f"- **Replication Status:** `{r_str}`")
+        lines.append(f"- **Overall Hypothesis Verdict:** **{evaluation.verdict.value}**\n")
         if has_zero_var:
             lines.append(r"\* *Identical outputs observed across seeds ($SD = 0.0000$); null hypothesis significance testing uninformative.*" + "\n")
 
@@ -907,6 +1001,10 @@ class ManuscriptCompiler:
         citation_keys: dict[str, str],
         papers_map: dict[str, PaperMetadata],
         figures: list[tuple[Path, Path]],
+        successful_seeds: Optional[list[int]] = None,
+        requested_seeds: Optional[list[int]] = None,
+        n_completed: Optional[int] = None,
+        n_requested: Optional[int] = None,
     ) -> str:
         """Construct publication-ready IEEEtran LaTeX article using structured LaTeX AST."""
         exp_class = spec.experiment_class
@@ -915,6 +1013,11 @@ class ManuscriptCompiler:
         doc.add(LatexCommand("title", title))
         doc.add(LatexCommand("author", "Research OS Autonomous Scientific System"))
         doc.add(LatexRaw("\\maketitle\n"))
+
+        if n_completed is None:
+            n_completed = len(successful_seeds) if successful_seeds is not None else evaluation.successful_runs
+        if n_requested is None:
+            n_requested = len(requested_seeds) if requested_seeds is not None else len(spec.random_seeds)
 
         # Abstract
         study_type = (
@@ -948,8 +1051,8 @@ class ManuscriptCompiler:
             f"We present an automated {study_type} investigating the hypothesis that "
             f"{clean_statement}. Addressing documented scientific gaps in baseline "
             f"{clean_baseline}, we operationalize and test {clean_mechanism}. "
-            f"Under a multi-seed protocol ({len(spec.random_seeds)} stochastic seeds under "
-            f"benchmark operationalization), results yield a {verdict_type} of "
+            f"Evaluated across N_completed = {n_completed} verified runs (out of {n_requested} requested), "
+            f"results yield a {verdict_type} of "
             f"\\textbf{{{evaluation.verdict.value}}} for target metric {clean_metric}. "
             f"{clean_summary}"
         )
@@ -1033,12 +1136,40 @@ class ManuscriptCompiler:
         eval_intro = (
             f"The multi-seed evaluation executed {evaluation.total_runs} seed runs "
             f"({evaluation.successful_runs} passed, {evaluation.failed_runs} failed). "
+            f"Evaluated across N_completed = {n_completed} verified runs (out of {n_requested} requested). "
             f"The aggregated statistical metrics are summarized in Table~\\ref{{tab:metrics}}."
         )
         doc.add(LatexText(eval_intro, raw=True))
 
         # Statistical Table via Typed AST Node (Directive 4)
-        doc.add(LatexMetricTable(evidence_table_ref=evaluation))
+        doc.add(
+            LatexMetricTable(
+                evidence_table_ref=evaluation,
+                successful_seeds=successful_seeds,
+                requested_seeds=requested_seeds,
+                n_completed=n_completed,
+                n_requested=n_requested,
+            )
+        )
+
+        t_val = getattr(evaluation, "threshold_status", None)
+        s_val = getattr(evaluation, "statistical_support", None)
+        r_val = getattr(evaluation, "replication_status", None)
+        t_str = t_val.value if hasattr(t_val, "value") else (str(t_val) if t_val else "N/A")
+        s_str = s_val.value if hasattr(s_val, "value") else (str(s_val) if s_val else "N/A")
+        r_str = r_val.value if hasattr(r_val, "value") else (str(r_val) if r_val else "N/A")
+        if n_completed < 2:
+            s_str = "INSUFFICIENT"
+            r_str = "SINGLE_POINT"
+
+        doc.add(LatexCommand("subsection", "Decoupled Scientific Evaluation Verdicts"))
+        verdict_summary = (
+            f"\\textbf{{Threshold Status:}} \\texttt{{{t_str}}} \\\\ \n"
+            f"\\textbf{{Statistical Support:}} \\texttt{{{s_str}}} \\\\ \n"
+            f"\\textbf{{Replication Status:}} \\texttt{{{r_str}}} \\\\ \n"
+            f"\\textbf{{Overall Verdict:}} \\textbf{{{evaluation.verdict.value}}}\n\n"
+        )
+        doc.add(LatexText(verdict_summary, raw=True))
 
         # Figures via Typed AST Node (Directive 4)
         if figures:

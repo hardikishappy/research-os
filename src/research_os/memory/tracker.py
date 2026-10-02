@@ -143,4 +143,35 @@ class ExperimentTracker:
 
         manifest_path = run_dir / "manifest.json"
         manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+
+        # Write authoritative verified_execution_manifest.json
+        req_seeds = []
+        if extra_metadata and "requested_seeds" in extra_metadata:
+            req_seeds = extra_metadata["requested_seeds"]
+        elif spec and spec.random_seeds:
+            req_seeds = spec.random_seeds
+
+        succ_seeds = []
+        if extra_metadata and "successful_seeds" in extra_metadata:
+            succ_seeds = extra_metadata["successful_seeds"]
+        elif extra_metadata and "seeds_evaluated" in extra_metadata:
+            succ_seeds = extra_metadata["seeds_evaluated"]
+        else:
+            succ_seeds = list(req_seeds)
+
+        exec_manifest = dict(manifest)
+        exec_manifest.update({
+            "requested_seeds": req_seeds,
+            "successful_seeds": succ_seeds,
+            "failed_seeds": [s for s in req_seeds if s not in succ_seeds],
+            "n_requested": len(req_seeds),
+            "n_completed": len(succ_seeds),
+        })
+        if extra_metadata:
+            exec_manifest.update(extra_metadata)
+
+        (run_dir / "verified_execution_manifest.json").write_text(
+            json.dumps(exec_manifest, indent=2), encoding="utf-8"
+        )
+
         return manifest

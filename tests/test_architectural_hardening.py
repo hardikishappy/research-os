@@ -445,3 +445,214 @@ def test_latex_figure_path_resolution(tmp_path: Path):
     fig_tex = fig_node.render()
     assert "\\includegraphics[width=\\columnwidth]{figures/convergence.png}" in fig_tex
     assert "noise $\\le$ 10\\%" in fig_tex
+
+
+# ==============================================================================
+# PROVENANCE-BOUND ARCHITECTURE & EXECUTION HARDENING TESTS
+# ==============================================================================
+
+
+def test_fetch_verified_data_fails_closed_on_missing_dataset(tmp_path: Path):
+    """Task 1: Missing dataset raises fatal DatasetIntegrityError without generating synthetic placeholders."""
+    from research_os.plugins.base import DatasetIntegrityError
+    from research_os.plugins.nlp.plugin import NLPPlugin
+
+    adapter = NLPPlugin()
+    non_existent_dataset = "non_existent_domain_dataset_v999"
+    test_cache = tmp_path / "cache"
+
+    with pytest.raises(DatasetIntegrityError) as exc_info:
+        adapter.fetch_verified_data(non_existent_dataset, target_dir=test_cache)
+
+    assert "failed checksum verification or is missing" in str(exc_info.value)
+
+    # Invariant: Must NOT write any mock or placeholder file on disk
+    cache_path = test_cache / adapter.domain_id / f"{non_existent_dataset}.dat"
+    assert not cache_path.exists()
+
+
+def test_child_execution_token_detects_parameter_tampering(tmp_path: Path):
+    """Task 2: Running modified parameters under an approved child token raises UnauthorizedExecutionMutation."""
+    from research_os.gate.approval import (
+        HumanApprovalGate,
+        mint_child_delegation_token,
+        UnauthorizedExecutionMutation,
+    )
+    from research_os.sandbox.runner import PolicySubprocessRunner
+    from research_os.schemas.experiment import ExperimentSpec, ExperimentType, HardwareRequirements
+
+    code_dir = tmp_path / "code"
+    output_dir = tmp_path / "output"
+    code_dir.mkdir(parents=True)
+    output_dir.mkdir(parents=True)
+
+    script = code_dir / "run_sim.py"
+    script.write_text("print('success')\n", encoding="utf-8")
+
+    spec = ExperimentSpec(
+        spec_id="spec-parent-01",
+        hypothesis_id="hyp-01",
+        name="Param Tamper Test",
+        experiment_type=ExperimentType.BENCHMARK,
+        entry_point="python run_sim.py",
+        random_seeds=[42],
+        expected_outputs=["output.txt"],
+        run_config={"learning_rate": 0.01, "seed": 42},
+        timeout_seconds=30,
+        hardware_requirements=HardwareRequirements(min_ram_gb=1.0, max_cpu_cores=1),
+    )
+
+    gate = HumanApprovalGate()
+    parent_token = gate.request_approval(
+        spec=spec,
+        run_id="run-parent-01",
+        user="test-architect",
+        auto_approve=True,
+    )
+
+    # Mint approved child token bound to seed=42 and learning_rate=0.01
+    child_spec = spec.model_copy(deep=True)
+    child_token = mint_child_delegation_token(
+        parent_token=parent_token,
+        seed=42,
+        seed_spec=child_spec,
+        seed_code_dir=code_dir,
+        actual_seed_id="run-parent-01-s42",
+        grid_cell_params={"learning_rate": 0.01},
+    )
+
+    runner = PolicySubprocessRunner()
+
+    # Baseline: untampered execution succeeds
+    baseline_res = runner.execute(
+        spec=child_spec,
+        gate_token=child_token,
+        code_dir=code_dir,
+        output_dir=output_dir,
+    )
+    assert baseline_res.exit_code == 0
+
+    # Tampering Attack: Alter runtime parameter in spec.run_config
+    tampered_param_spec = child_spec.model_copy(deep=True)
+    tampered_param_spec.run_config["learning_rate"] = 0.99  # unsanctioned knob mutation
+
+    # Fresh single-use child token
+    child_token2 = mint_child_delegation_token(
+        parent_token=parent_token,
+        seed=42,
+        seed_spec=child_spec,
+        seed_code_dir=code_dir,
+        actual_seed_id="run-parent-01-s42-tamper",
+        grid_cell_params={"learning_rate": 0.01},
+    )
+
+    with pytest.raises(UnauthorizedExecutionMutation) as exc_info:
+        runner.execute(
+            spec=tampered_param_spec,
+            gate_token=child_token2,
+            code_dir=code_dir,
+            output_dir=output_dir,
+        )
+    assert "Child execution altered parameter" in str(exc_info.value)
+
+    # Verify structured error payload was serialized with remediation hint (Task 5)
+    err_file = output_dir / "error.json"
+    assert err_file.exists()
+    err_payload = json.loads(err_file.read_text(encoding="utf-8"))
+    assert err_payload["error_code"] == "ERR_UNAUTHORIZED_MUTATION"
+    assert "remediation" in str(err_payload).lower() or "hint" in err_payload
+
+
+def test_manuscript_reflects_actual_manifest_seeds(tmp_path: Path):
+    """Task 3: Run with 2 executed seeds reports N=2 in paper.tex, not 3 requested in spec.json."""
+    from research_os.manuscript.compiler import ManuscriptCompiler
+    from research_os.schemas.evaluation import EvaluationReport, HypothesisVerdict, MetricAggregate, SeedRunSummary
+    from research_os.schemas.experiment import ExperimentSpec, ExperimentType, HardwareRequirements
+    from research_os.schemas.hypothesis import HypothesisProposal
+
+    output_dir = tmp_path / "manuscript"
+    output_dir.mkdir(parents=True)
+
+    # Spec originally requested 3 seeds: [42, 101, 2024]
+    spec = ExperimentSpec(
+        spec_id="spec-seeds-test",
+        hypothesis_id="hyp-seeds-test",
+        name="Seed Manifest Verification",
+        experiment_type=ExperimentType.BENCHMARK,
+        entry_point="python run.py",
+        random_seeds=[42, 101, 2024],
+        expected_outputs=["metrics.json"],
+        run_config={},
+        timeout_seconds=30,
+        hardware_requirements=HardwareRequirements(min_ram_gb=1.0, max_cpu_cores=1),
+    )
+
+    hyp = HypothesisProposal(
+        hypothesis_id="hyp-seeds-test",
+        title="Seed Manifest Alignment Study",
+        falsifiable_statement="Evaluating verified execution manifests eliminates pre-registered discrepancy.",
+        baseline_method="Standard Baseline",
+        proposed_mechanism="Authoritative Manifest Binding",
+        theoretical_rationale="Grounded in cryptographic multi-seed provenance.",
+        target_metric="accuracy",
+        expected_direction="increase",
+        success_threshold=0.80,
+    )
+
+    # Only 2 seeds succeeded in execution: [42, 101]
+    evaluation = EvaluationReport(
+        evaluation_id="eval-seeds-01",
+        hypothesis_id=hyp.hypothesis_id,
+        spec_id=spec.spec_id,
+        seeds_evaluated=[42, 101],
+        total_runs=2,
+        successful_runs=2,
+        failed_runs=0,
+        verdict=HypothesisVerdict.CONFIRMED,
+        target_metric="accuracy",
+        metric_aggregates={
+            "accuracy": MetricAggregate(
+                metric_name="accuracy",
+                sample_values=[0.85, 0.87],
+                mean=0.86,
+                std_dev=0.0141,
+                std_err=0.01,
+                target_threshold=0.80,
+                operator=">=",
+                passed=True,
+                p_value_estimate=0.02,
+                significance_claim_allowed=True,
+            )
+        },
+        seed_runs=[
+            SeedRunSummary(seed=42, run_id="run-s42", exit_code=0, verification_status="PASS", metrics={"accuracy": 0.85}),
+            SeedRunSummary(seed=101, run_id="run-s101", exit_code=0, verification_status="PASS", metrics={"accuracy": 0.87}),
+        ],
+        summary_rationale="Empirical threshold met under multi-seed evaluation.",
+    )
+
+    manifest_data = {
+        "run_id": "run-seeds-test",
+        "requested_seeds": [42, 101, 2024],
+        "successful_seeds": [42, 101],
+        "failed_seeds": [2024],
+        "n_requested": 3,
+        "n_completed": 2,
+    }
+
+    compiler = ManuscriptCompiler(run_id="run-seeds-test", output_dir=output_dir)
+    bundle = compiler.compile(
+        hypothesis=hyp,
+        spec=spec,
+        evaluation=evaluation,
+        execution_manifest=manifest_data,
+    )
+
+    tex_content = Path(bundle.latex_path).read_text(encoding="utf-8")
+    md_content = Path(bundle.markdown_path).read_text(encoding="utf-8")
+
+    expected_phrase = "Evaluated across N_completed = 2 verified runs (out of 3 requested)."
+    assert expected_phrase in tex_content
+    assert expected_phrase in md_content
+    assert "Evaluated across N_completed = 2 verified runs (out of 3 requested)." in tex_content
+

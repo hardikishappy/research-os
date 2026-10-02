@@ -74,11 +74,15 @@ def resolve_figure_path(figure_path: Union[str, Path], manuscript_dir: Union[str
     m_dir = Path(manuscript_dir).resolve()
     fig = Path(figure_path)
 
-    # If already relative to manuscript_dir
-    if not fig.is_absolute():
+    # Check if relative to manuscript_dir first, then relative to CWD
+    if (m_dir / fig).exists():
         resolved_fig = (m_dir / fig).resolve()
-    else:
+    elif fig.exists():
         resolved_fig = fig.resolve()
+    elif fig.is_absolute():
+        resolved_fig = fig.resolve()
+    else:
+        resolved_fig = (m_dir / fig).resolve()
 
     try:
         rel = resolved_fig.relative_to(m_dir)
@@ -312,6 +316,7 @@ class LatexDocument(LatexNode):
             "graphicx",
             "hyperref",
             "cite",
+            "underscore",
         ]
         self.body_nodes: list[LatexNode] = []
 
@@ -427,10 +432,18 @@ class LatexMetricTable(LatexNode):
         evidence_table_ref: Any,
         caption: str = "Aggregated Multi-Seed Statistical Evaluation",
         label: str = "tab:metrics",
+        successful_seeds: Optional[list[int]] = None,
+        requested_seeds: Optional[list[int]] = None,
+        n_completed: Optional[int] = None,
+        n_requested: Optional[int] = None,
     ) -> None:
         self.evidence_table_ref = evidence_table_ref
         self.caption = caption
         self.label = label
+        self.successful_seeds = successful_seeds
+        self.requested_seeds = requested_seeds
+        self.n_completed = n_completed
+        self.n_requested = n_requested
 
     def render(self) -> str:
         ref = self.evidence_table_ref
@@ -446,16 +459,34 @@ class LatexMetricTable(LatexNode):
         else:
             raise ValueError(f"Unsupported evidence_table_ref type: {type(ref)}")
 
+        # Determine authoritative n_completed and n_requested
+        n_comp = self.n_completed
+        if n_comp is None and self.successful_seeds is not None:
+            n_comp = len(self.successful_seeds)
+        if n_comp is None and hasattr(ref, "successful_runs"):
+            n_comp = ref.successful_runs
+        if n_comp is None:
+            n_comp = n_runs
+
+        n_req = self.n_requested
+        if n_req is None and self.requested_seeds is not None:
+            n_req = len(self.requested_seeds)
+        if n_req is None and hasattr(ref, "total_runs"):
+            n_req = ref.total_runs
+        if n_req is None:
+            n_req = n_comp
+
         headers = [
             "Metric",
             LatexRaw("Mean ($M$)", allow_claims=True),
             LatexRaw("SD", allow_claims=True),
-            LatexRaw("$N$", allow_claims=True),
-            LatexRaw("d.f.", allow_claims=True),
             LatexRaw("$p$-value", allow_claims=True),
+            "Threshold",
+            LatexRaw("Stat.\\ Support", allow_claims=True),
+            "Replication",
             "Verdict",
         ]
-        df_val = max(1, n_runs - 1)
+        df_val = max(1, n_comp - 1)
         rows: list[list[Union[str, LatexNode]]] = []
         has_zero_var = False
         for m_name, agg in aggs.items():
@@ -471,6 +502,11 @@ class LatexMetricTable(LatexNode):
             if not sig_allowed and stat_analysis:
                 sig_allowed = getattr(stat_analysis, "significance_claim_allowed", False) if not isinstance(stat_analysis, dict) else stat_analysis.get("significance_claim_allowed", False)
 
+            # Task 3: If completed seeds N < 2, automatically suppress statistical significance claims.
+            if n_comp < 2:
+                sig_allowed = False
+                p_val = None
+
             pass_str = "Confirmed" if passed else "Refuted"
             if len(samples) > 1 and std_dev == 0.0:
                 p_val_str = "N/A*"
@@ -480,13 +516,26 @@ class LatexMetricTable(LatexNode):
             else:
                 p_val_str = f"{p_val:.4f}"
 
+            t_val = getattr(ref, "threshold_status", None)
+            s_val = getattr(ref, "statistical_support", None)
+            r_val = getattr(ref, "replication_status", None)
+
+            t_str = t_val.value if hasattr(t_val, "value") else (str(t_val) if t_val else ("PASS" if passed else "FAIL"))
+            s_str = s_val.value if hasattr(s_val, "value") else (str(s_val) if s_val else ("SIGNIFICANT" if sig_allowed else "INSUFFICIENT"))
+            if n_comp < 2:
+                s_str = "INSUFFICIENT"
+                r_str = "SINGLE_POINT"
+            else:
+                r_str = r_val.value if hasattr(r_val, "value") else (str(r_val) if r_val else ("REPRODUCIBLE" if std_dev > 0 else "SINGLE_POINT"))
+
             rows.append([
                 m_name,
                 f"{mean:.4f}",
                 f"{std_dev:.4f}",
-                str(n_runs),
-                str(df_val),
                 p_val_str,
+                t_str,
+                s_str,
+                r_str,
                 pass_str,
             ])
 
@@ -496,7 +545,7 @@ class LatexMetricTable(LatexNode):
             else None
         )
         escaped_title = escape_latex(self.caption)
-        caption_str = f"{escaped_title} ($N={n_runs}$)"
+        caption_str = f"{escaped_title}. Evaluated across N_completed = {n_comp} verified runs (out of {n_req} requested)."
         return LatexTable(
             headers=headers,
             rows=rows,

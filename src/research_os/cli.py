@@ -26,7 +26,7 @@ from research_os.memory.tracker import ExperimentTracker
 from research_os.models import get_model_adapter
 from research_os.models.health import check_model_health
 from research_os.planning.planner import ExperimentPlanner
-from research_os.sandbox.runner import SandboxRunner
+from research_os.sandbox.runner import PolicySubprocessRunner, SandboxRunner
 from research_os.schemas.evaluation import EvaluationReport, HypothesisVerdict, MetricAggregate, SeedRunSummary
 from research_os.schemas.experiment import ExperimentSpec
 from research_os.schemas.hypothesis import HypothesisProposal
@@ -322,6 +322,11 @@ def run_experiment(
             spec=spec,
             extra_metadata={
                 "verdict": eval_report.verdict.value,
+                "threshold_status": eval_report.threshold_status.value if eval_report.threshold_status else None,
+                "statistical_support": eval_report.statistical_support.value if eval_report.statistical_support else None,
+                "replication_status": eval_report.replication_status.value if eval_report.replication_status else None,
+                "requested_seeds": spec.random_seeds,
+                "successful_seeds": [s.seed for s in eval_report.seed_runs if s.exit_code == 0],
                 "grid_id": grid_report.grid_id,
                 "best_parameters": grid_report.best_parameters,
                 "total_combinations": grid_report.total_combinations,
@@ -397,6 +402,11 @@ def run_experiment(
             spec=spec,
             extra_metadata={
                 "verdict": eval_report.verdict.value,
+                "threshold_status": eval_report.threshold_status.value if eval_report.threshold_status else None,
+                "statistical_support": eval_report.statistical_support.value if eval_report.statistical_support else None,
+                "replication_status": eval_report.replication_status.value if eval_report.replication_status else None,
+                "requested_seeds": spec.random_seeds,
+                "successful_seeds": [s.seed for s in eval_report.seed_runs if s.exit_code == 0],
                 "seeds_evaluated": eval_report.seeds_evaluated,
                 "successful_runs": eval_report.successful_runs,
             },
@@ -650,13 +660,47 @@ def run_compile_manuscript(
     if synth_path.exists():
         synthesis = CrossPaperSynthesis.from_json(synth_path.read_text(encoding="utf-8"))
 
+    manifest_data = None
+    manifest_candidates = [
+        run_path / "verified_execution_manifest.json",
+        run_path / "artifacts" / "verified_execution_manifest.json",
+        run_path / "manifest.json",
+    ]
+    for m_cand in manifest_candidates:
+        if m_cand.exists():
+            try:
+                manifest_data = json.loads(m_cand.read_text(encoding="utf-8"))
+                break
+            except Exception:
+                pass
+
     compiler = ManuscriptCompiler(run_id=run_id, output_dir=output_dir)
-    bundle = compiler.compile(
-        hypothesis=hyp,
-        spec=spec,
-        evaluation=evaluation,
-        synthesis=synthesis,
-    )
+    try:
+        bundle = compiler.compile(
+            hypothesis=hyp,
+            spec=spec,
+            evaluation=evaluation,
+            synthesis=synthesis,
+            execution_manifest=manifest_data,
+        )
+    except Exception as exc:
+        err_code, hint = PolicySubprocessRunner._diagnose_exception(exc)
+        PolicySubprocessRunner.write_error_payload(
+            run_path / "output",
+            error_code=err_code,
+            stage="MANUSCRIPT_COMPILATION",
+            message=str(exc),
+            hint=hint,
+            details={"run_id": run_id, "exception_type": type(exc).__name__},
+        )
+        PolicySubprocessRunner.emit_event(
+            run_path / "output",
+            stage="MANUSCRIPT_COMPILATION",
+            status="FAILED",
+            code=err_code,
+            details={"error": str(exc), "remediation_hint": hint},
+        )
+        raise
 
     print(f"\n=======================================================")
     print(f" Research OS: Manuscript Compilation Complete")
@@ -1054,7 +1098,9 @@ def main() -> None:
                 grid_config=args.grid_config,
             )
         except Exception as e:
-            print(f"Error during experiment execution: {e}", file=sys.stderr)
+            err_code, hint = PolicySubprocessRunner._diagnose_exception(e)
+            print(f"\n[FATAL ERROR] {err_code}: {e}", file=sys.stderr)
+            print(f"[REMEDIATION HINT] {hint}\n", file=sys.stderr)
             sys.exit(1)
 
     elif args.command == "harvest":
@@ -1078,7 +1124,9 @@ def main() -> None:
                 output_dir=args.output_dir,
             )
         except Exception as e:
-            print(f"Error compiling manuscript: {e}", file=sys.stderr)
+            err_code, hint = PolicySubprocessRunner._diagnose_exception(e)
+            print(f"\n[FATAL ERROR] {err_code}: {e}", file=sys.stderr)
+            print(f"[REMEDIATION HINT] {hint}\n", file=sys.stderr)
             sys.exit(1)
 
     elif args.command == "dashboard":

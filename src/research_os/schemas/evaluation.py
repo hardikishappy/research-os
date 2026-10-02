@@ -45,6 +45,29 @@ class HypothesisVerdict(str, Enum):
     INCONCLUSIVE = "INCONCLUSIVE"
 
 
+class ThresholdStatus(str, Enum):
+    """Status indicating whether the empirical mean satisfied the registered target threshold."""
+
+    PASS = "PASS"
+    FAIL = "FAIL"
+
+
+class StatisticalSupport(str, Enum):
+    """Inferential status conditioned on statistical significance and sample power (p-value, N >= 3)."""
+
+    SIGNIFICANT = "SIGNIFICANT"
+    INSUFFICIENT = "INSUFFICIENT"
+    INFORMATIVE_NON_SIGNIFICANT = "INFORMATIVE_NON_SIGNIFICANT"
+
+
+class ReplicationStatus(str, Enum):
+    """Cross-seed replication and dispersion stability classification."""
+
+    REPRODUCIBLE = "REPRODUCIBLE"
+    HIGH_VARIANCE = "HIGH_VARIANCE"
+    SINGLE_POINT = "SINGLE_POINT"
+
+
 class MetricAggregate(ArtifactBaseModel):
     """Statistical summary across multiple seed executions."""
 
@@ -131,6 +154,18 @@ class EvaluationReport(ArtifactBaseModel):
     successful_runs: int = Field(description="Number of runs with exit code 0 and valid metrics")
     failed_runs: int = Field(description="Number of aborted or failed runs")
     verdict: HypothesisVerdict = Field(description="Final empirical verdict: CONFIRMED, REFUTED, or INCONCLUSIVE")
+    threshold_status: Optional[ThresholdStatus] = Field(
+        default=None,
+        description="Whether empirical mean met the registered numeric threshold (PASS | FAIL)",
+    )
+    statistical_support: Optional[StatisticalSupport] = Field(
+        default=None,
+        description="Statistical support conditioned on p-value and N >= 3 (SIGNIFICANT | INSUFFICIENT | INFORMATIVE_NON_SIGNIFICANT)",
+    )
+    replication_status: Optional[ReplicationStatus] = Field(
+        default=None,
+        description="Cross-seed replication and variance stability (REPRODUCIBLE | HIGH_VARIANCE | SINGLE_POINT)",
+    )
     target_metric: str = Field(description="Primary metric tested")
     metric_aggregates: dict[str, MetricAggregate] = Field(
         default_factory=dict,
@@ -155,6 +190,9 @@ class GridCombinationSummary(ArtifactBaseModel):
     seeds_evaluated: list[int] = Field(description="Seeds evaluated under this combination")
     successful_runs: int = Field(description="Number of successful runs")
     verdict: HypothesisVerdict = Field(description="Verdict for this combination")
+    threshold_status: Optional[ThresholdStatus] = Field(default=None, description="PASS or FAIL threshold status")
+    statistical_support: Optional[StatisticalSupport] = Field(default=None, description="Statistical support classification")
+    replication_status: Optional[ReplicationStatus] = Field(default=None, description="Replication stability classification")
     mean_target_metric: float = Field(description="Mean observed value for target metric")
     std_dev_target_metric: float = Field(default=0.0, description="Standard deviation for target metric")
     std_err_target_metric: float = Field(default=0.0, description="Standard error for target metric")

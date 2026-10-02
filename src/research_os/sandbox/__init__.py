@@ -8,6 +8,7 @@ from .runner import (
     SandboxExecutionResult,
     SandboxRunner,
     SandboxSecurityViolation,
+    UnauthorizedExecutionMutation,
 )
 from .verification import verify_anti_fabrication
 
@@ -17,5 +18,6 @@ __all__ = [
     "SandboxRunner",
     "SandboxExecutionResult",
     "SandboxSecurityViolation",
+    "UnauthorizedExecutionMutation",
     "verify_anti_fabrication",
 ]

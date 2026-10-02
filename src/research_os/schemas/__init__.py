@@ -16,8 +16,11 @@ from .evaluation import (
     GridEvaluationReport,
     HypothesisVerdict,
     MetricAggregate,
+    ReplicationStatus,
     SeedRunSummary,
     StatisticalAnalysisResult,
+    StatisticalSupport,
+    ThresholdStatus,
 )
 
 __all__ = [
@@ -44,5 +47,8 @@ __all__ = [
     "GridEvaluationReport",
     "HypothesisVerdict",
     "MetricAggregate",
+    "ReplicationStatus",
     "SeedRunSummary",
+    "StatisticalSupport",
+    "ThresholdStatus",
 ]

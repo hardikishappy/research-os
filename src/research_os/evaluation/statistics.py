@@ -16,7 +16,12 @@ import math
 from typing import Optional, Sequence
 import scipy.stats as stats
 
-from research_os.schemas.evaluation import StatisticalAnalysisResult
+from research_os.schemas.evaluation import (
+    ReplicationStatus,
+    StatisticalAnalysisResult,
+    StatisticalSupport,
+    ThresholdStatus,
+)
 
 
 def student_t_p_value(t_stat: float, df: int) -> float:
@@ -279,3 +284,58 @@ def compute_paired_item_inference(
         significance_claim_allowed=sig_allowed,
         reasons_significance_blocked=reasons_blocked,
     )
+
+
+def determine_decoupled_verdicts(
+    sample_values: Sequence[float],
+    mean: float,
+    std_dev: float,
+    target_threshold: float,
+    operator: str = ">=",
+    p_value: Optional[float] = None,
+    alpha: float = 0.05,
+    significance_allowed: bool = False,
+) -> tuple[ThresholdStatus, StatisticalSupport, ReplicationStatus]:
+    """Calculate the 3 decoupled outcome verdicts in empirical evaluation (Directive 4).
+
+    1. threshold_status: PASS | FAIL (whether empirical mean met registered numeric threshold).
+    2. statistical_support: SIGNIFICANT | INSUFFICIENT | INFORMATIVE_NON_SIGNIFICANT (conditioned on p-value and N >= 3).
+    3. replication_status: REPRODUCIBLE | HIGH_VARIANCE | SINGLE_POINT (conditioned on cross-seed variance stability).
+    """
+    n = len(sample_values)
+
+    # 1. threshold_status: PASS | FAIL
+    passed = False
+    if operator == ">":
+        passed = mean > target_threshold
+    elif operator == ">=":
+        passed = mean >= target_threshold
+    elif operator == "<":
+        passed = mean < target_threshold
+    elif operator == "<=":
+        passed = mean <= target_threshold
+    elif operator == "==":
+        passed = abs(mean - target_threshold) < 1e-9
+
+    thresh_status = ThresholdStatus.PASS if passed else ThresholdStatus.FAIL
+
+    # 2. statistical_support: SIGNIFICANT | INSUFFICIENT | INFORMATIVE_NON_SIGNIFICANT
+    if n < 3 or p_value is None:
+        stat_support = StatisticalSupport.INSUFFICIENT
+    elif p_value < alpha and significance_allowed:
+        stat_support = StatisticalSupport.SIGNIFICANT
+    else:
+        stat_support = StatisticalSupport.INFORMATIVE_NON_SIGNIFICANT
+
+    # 3. replication_status: REPRODUCIBLE | HIGH_VARIANCE | SINGLE_POINT
+    if n <= 1:
+        rep_status = ReplicationStatus.SINGLE_POINT
+    else:
+        abs_mean = abs(mean) if abs(mean) > 1e-9 else 1.0
+        cv = std_dev / abs_mean
+        if cv > 0.35:
+            rep_status = ReplicationStatus.HIGH_VARIANCE
+        else:
+            rep_status = ReplicationStatus.REPRODUCIBLE
+
+    return thresh_status, stat_support, rep_status

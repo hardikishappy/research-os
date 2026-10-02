@@ -22,6 +22,11 @@ from research_os.schemas.experiment import ExperimentSpec
 from research_os.schemas.hypothesis import HypothesisProposal
 
 
+class DatasetIntegrityError(RuntimeError):
+    """Raised when an empirical baseline dataset is missing or fails cryptographic checksum verification."""
+    pass
+
+
 class BaseDomainAdapter(DomainPlugin):
     """Universal domain adapter interface for all Research OS applied domains."""
 
@@ -45,22 +50,26 @@ class BaseDomainAdapter(DomainPlugin):
         """Pulls empirical baseline datasets with cryptographic SHA-256 caching.
         
         Supports local cache resolution, verified checksum verification, and authentic data acquisition.
+        Fails closed: never generates mock or placeholder datasets if missing or checksum invalid.
         """
         cache_base = Path(target_dir or "data/cache") / self.domain_id
-        cache_base.mkdir(parents=True, exist_ok=True)
         safe_name = dataset_id.replace("/", "_").replace("\\", "_").replace(":", "_")
         cached_file = cache_base / f"{safe_name}.dat"
 
         # Check existing cached data with SHA-256 integrity
-        if cached_file.exists():
-            content = cached_file.read_bytes()
-            actual_sha = hashlib.sha256(content).hexdigest()
-            if expected_sha256 is None or actual_sha == expected_sha256:
-                return cached_file
+        if not cached_file.exists():
+            raise DatasetIntegrityError(
+                f"Dataset {dataset_id} failed checksum verification or is missing at {cached_file}"
+            )
 
-        # Grounded empirical baseline record caching
-        content = f"# Empirical Baseline Dataset: {dataset_id}\n# Domain: {self.domain_id}\n# Verified Cryptographic Cache\n".encode("utf-8")
-        cached_file.write_bytes(content)
+        content = cached_file.read_bytes()
+        actual_sha = hashlib.sha256(content).hexdigest()
+        if expected_sha256 is not None and actual_sha.lower() != expected_sha256.lower():
+            raise DatasetIntegrityError(
+                f"Dataset {dataset_id} failed checksum verification or is missing: "
+                f"expected {expected_sha256}, got {actual_sha}"
+            )
+
         return cached_file
 
     @abstractmethod

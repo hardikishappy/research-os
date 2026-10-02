@@ -440,12 +440,30 @@ def verify_approval_token(
         return False
 
 
+class UnauthorizedExecutionMutation(PermissionError):
+    """Raised when an execution violates parameter, seed, or code claims bound to its authorization token."""
+    pass
+
+
+def compute_child_execution_hash(
+    parent_spec_hash: str,
+    grid_cell_params: dict[str, Any],
+    seed: int,
+    code_hash: str,
+) -> str:
+    """Compute cryptographic child execution hash binding parent spec, grid parameters, seed, and code."""
+    grid_cell_params_json = json.dumps(grid_cell_params or {}, sort_keys=True)
+    raw = f"{parent_spec_hash}{grid_cell_params_json}{seed}{code_hash}".encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
+
+
 def mint_child_delegation_token(
     parent_token: HumanGateToken,
     seed: int,
     seed_spec: ExperimentSpec,
     seed_code_dir: Union[str, Path],
     actual_seed_id: str,
+    grid_cell_params: Optional[dict[str, Any]] = None,
     private_key: Optional[ed25519.Ed25519PrivateKey] = None,
 ) -> HumanGateToken:
     """Cryptographically derive a child seed execution token from an approved parent gate token (A5, A6, A7).
@@ -453,7 +471,7 @@ def mint_child_delegation_token(
     Validates that:
     1. Parent token is approved and valid.
     2. Seed is authorized within parent spec random_seeds or payload.
-    3. Hashing binds seed_spec, seed_code_dir, seed_config, and a unique child single-use nonce.
+    3. Hashing binds parent spec, grid cell params, seed, code hash, and a unique child single-use nonce.
     4. Attests the delegation with a valid Ed25519 signature from the active key backend.
     """
     if not parent_token.is_approved():
@@ -471,6 +489,18 @@ def mint_child_delegation_token(
     seed_code_hash = compute_code_hash(p_code, seed_spec.entry_point)
     seed_config_hash = compute_config_hash(seed_spec)
     seed_canonical_hash = compute_canonical_spec_hash(seed_spec)
+    parent_spec_hash = (
+        parent_payload.get("canonical_spec_hash")
+        or parent_payload.get("spec_sha256")
+        or seed_canonical_hash
+    )
+    params_dict = grid_cell_params if grid_cell_params is not None else {}
+    child_exec_hash = compute_child_execution_hash(
+        parent_spec_hash=parent_spec_hash,
+        grid_cell_params=params_dict,
+        seed=seed,
+        code_hash=seed_code_hash,
+    )
 
     now = datetime.now(timezone.utc)
     exp_str = parent_payload.get("expiration_timestamp") or (
@@ -486,6 +516,7 @@ def mint_child_delegation_token(
         "hypothesis_id": seed_spec.hypothesis_id,
         "canonical_spec_hash": seed_canonical_hash,
         "spec_sha256": seed_canonical_hash,
+        "parent_spec_hash": parent_spec_hash,
         "config_sha256": seed_config_hash,
         "code_sha256": seed_code_hash,
         "entry_point": seed_spec.entry_point,
@@ -502,6 +533,8 @@ def mint_child_delegation_token(
         "decided_at": now.isoformat(),
         "nonce": child_nonce,
         "seed": seed,
+        "grid_cell_params": params_dict,
+        "child_execution_hash": child_exec_hash,
         "parent_gate_id": parent_token.gate_id,
         "parent_signature": parent_token.authorization_signature,
         "delegation_kind": "CHILD_SEED_EXECUTION",

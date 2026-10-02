@@ -65,7 +65,12 @@ def compute_directory_checksums(dir_path: Union[str, Path]) -> dict[str, str]:
 
     checksums: dict[str, str] = {}
     for p in sorted(base.rglob("*")):
-        if p.is_file() and p.name != "manifest.json":
+        if p.is_file() and p.name not in (
+            "manifest.json",
+            "verified_execution_manifest.json",
+            "events.jsonl",
+            "error.json",
+        ):
             rel_path = p.relative_to(base).as_posix()
             checksums[rel_path] = compute_file_sha256(p)
     return checksums

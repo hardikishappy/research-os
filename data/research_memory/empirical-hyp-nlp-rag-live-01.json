@@ -1,5 +1,5 @@
 {
-  "extraction_id": "ext-eval-run-8bbde015-c0",
+  "extraction_id": "ext-eval-run-af1fb5b5-c0",
   "paper_id": "empirical-hyp-nlp-rag-live-01",
   "metadata": {
     "paper_id": "empirical-hyp-nlp-rag-live-01",
@@ -13,14 +13,14 @@
     "venue": "Research OS Closed-Loop Empirical Archive",
     "doi": null,
     "arxiv_id": null,
-    "url": "research-os://evaluations/eval-run-8bbde015-c0",
+    "url": "research-os://evaluations/eval-run-af1fb5b5-c0",
     "citation_count": 1
   },
   "sections": {
     "Abstract": "Empirical testing of hypothesis 'Retrieval-Augmented Generation vs Direct Generation on Hallucination Frequency' across 2 random seeds. Outcome: CONFIRMED. Rationale: Hypothesis CONFIRMED across 2 seeds: Mean observed hallucination_rate = 0.1 (std_err=0.1) satisfied threshold <= 0.2.",
     "Hypothesis & Proposed Mechanism": "Statement: Providing retrieved context chunks for knowledge-intensive queries reduces hallucination frequency by >= 50% compared to direct generation without context.\nProposed Mechanism: BM25 Sparse Retrieval Augmented Generation\nTheoretical Rationale: Conditioning on relevant factual passages restricts token generation distributions to verified source context.\nBaseline Method: Direct Closed-Book LLM Generation",
     "Experimental Protocol": "Spec ID: spec-hyp-nlp-rag-\nSeeds Evaluated: [42, 101]\nValid Completed Runs: 2/2",
-    "Results & Statistical Evaluation": "Empirical Multi-Seed Observations:\n- **hallucination_rate**: mean = 0.10 (std_dev = 0.14, std_err = 0.10), target <= 0.2 -> PASS\n- **baseline_hallucination_rate**: mean = 0.75 (std_dev = 0.07, std_err = 0.05), target >= 0.0 -> PASS\n- **shuffled_hallucination_rate**: mean = 0.60 (std_dev = 0.00, std_err = 0.00), target >= 0.0 -> PASS\n- **hallucination_reduction_pct**: mean = 85.72 (std_dev = 20.20, std_err = 14.29), target >= 0.0 -> PASS\n- **token_overlap_score**: mean = 0.94 (std_dev = 0.08, std_err = 0.06), target >= 0.0 -> PASS\n- **latency_ms**: mean = 1.97 (std_dev = 0.29, std_err = 0.20), target >= 0.0 -> PASS\n- **total_evaluated_queries**: mean = 10.00 (std_dev = 0.00, std_err = 0.00), target >= 0.0 -> PASS",
+    "Results & Statistical Evaluation": "Empirical Multi-Seed Observations:\n- **hallucination_rate**: mean = 0.10 (std_dev = 0.14, std_err = 0.10), target <= 0.2 -> PASS\n- **baseline_hallucination_rate**: mean = 0.75 (std_dev = 0.07, std_err = 0.05), target >= 0.0 -> PASS\n- **shuffled_hallucination_rate**: mean = 0.60 (std_dev = 0.00, std_err = 0.00), target >= 0.0 -> PASS\n- **hallucination_reduction_pct**: mean = 85.72 (std_dev = 20.20, std_err = 14.29), target >= 0.0 -> PASS\n- **token_overlap_score**: mean = 0.94 (std_dev = 0.08, std_err = 0.06), target >= 0.0 -> PASS\n- **latency_ms**: mean = 1.80 (std_dev = 0.02, std_err = 0.01), target >= 0.0 -> PASS\n- **total_evaluated_queries**: mean = 10.00 (std_dev = 0.00, std_err = 0.00), target >= 0.0 -> PASS",
     "Conclusion & Empirical Status": "Hypothesis Status: CONFIRMED\nScientific Verdict: Hypothesis CONFIRMED across 2 seeds: Mean observed hallucination_rate = 0.1 (std_err=0.1) satisfied threshold <= 0.2."
   },
   "section_provenance": [
@@ -75,5 +75,5 @@
   "limitations": [
     "Evaluated across 2 random simulation seeds."
   ],
-  "source_checksum": "a10a2503503cbf33f2c4760a3f3b779f1c3ffde37ebca4b751e995a19f5d5511"
+  "source_checksum": "032c650ee7d301ccadbbfef5a086d5d5fe0032ae4f81a9818aee17f972b6a54a"
 }

@@ -22,13 +22,17 @@ from research_os.gate.approval import (
 )
 from research_os.memory.tracker import ExperimentTracker
 from research_os.sandbox.runner import SandboxRunner
+from research_os.evaluation.statistics import determine_decoupled_verdicts
 from research_os.schemas.evaluation import (
     EvaluationReport,
     GridCombinationSummary,
     GridEvaluationReport,
     HypothesisVerdict,
     MetricAggregate,
+    ReplicationStatus,
     SeedRunSummary,
+    StatisticalSupport,
+    ThresholdStatus,
 )
 from research_os.schemas.experiment import ExperimentSpec
 from research_os.schemas.gate import GateKind, GateStatus, HumanGateToken
@@ -166,6 +170,21 @@ class StatisticalEvaluator:
                 f"(std_err={target_agg.std_err}) failed threshold {target_agg.operator} {target_agg.target_threshold}."
             )
 
+        if target_agg:
+            t_status, s_support, r_status = determine_decoupled_verdicts(
+                sample_values=target_agg.sample_values,
+                mean=target_agg.mean,
+                std_dev=target_agg.std_dev,
+                target_threshold=target_agg.target_threshold,
+                operator=target_agg.operator,
+                p_value=target_agg.p_value_estimate,
+                significance_allowed=target_agg.significance_claim_allowed,
+            )
+        else:
+            t_status = ThresholdStatus.FAIL
+            s_support = StatisticalSupport.INSUFFICIENT
+            r_status = ReplicationStatus.SINGLE_POINT
+
         return EvaluationReport(
             evaluation_id=eval_id,
             hypothesis_id=hypothesis.hypothesis_id,
@@ -175,6 +194,9 @@ class StatisticalEvaluator:
             successful_runs=len(successful),
             failed_runs=len(failed),
             verdict=verdict,
+            threshold_status=t_status,
+            statistical_support=s_support,
+            replication_status=r_status,
             target_metric=hypothesis.target_metric,
             metric_aggregates=aggregates,
             seed_runs=seed_runs,
@@ -240,6 +262,7 @@ class StatisticalEvaluator:
                 seed_spec=seed_spec,
                 seed_code_dir=seed_dir / "code",
                 actual_seed_id=actual_seed_id,
+                grid_cell_params={},
             )
             tracker.record_approval_token(actual_seed_id, seed_token)
 
@@ -409,6 +432,7 @@ class StatisticalEvaluator:
                     seed_spec=seed_spec,
                     seed_code_dir=seed_dir / "code",
                     actual_seed_id=actual_seed_id,
+                    grid_cell_params=params,
                 )
                 tracker.record_approval_token(actual_seed_id, seed_token)
 
@@ -474,6 +498,9 @@ class StatisticalEvaluator:
                 seeds_evaluated=seeds,
                 successful_runs=combo_eval.successful_runs,
                 verdict=combo_eval.verdict,
+                threshold_status=combo_eval.threshold_status,
+                statistical_support=combo_eval.statistical_support,
+                replication_status=combo_eval.replication_status,
                 mean_target_metric=mean_target,
                 std_dev_target_metric=sd_target,
                 std_err_target_metric=se_target,

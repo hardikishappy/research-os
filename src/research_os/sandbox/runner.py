@@ -25,6 +25,8 @@ import psutil
 from pydantic import BaseModel, Field
 
 from research_os.gate.approval import (
+    UnauthorizedExecutionMutation,
+    compute_child_execution_hash,
     compute_code_hash,
     compute_config_hash,
     verify_approval_token,
@@ -99,6 +101,106 @@ class PolicySubprocessRunner:
 
     def __init__(self, default_timeout_seconds: int = 60) -> None:
         self.default_timeout_seconds = default_timeout_seconds
+
+    @staticmethod
+    def emit_event(
+        output_dir: Union[str, Path],
+        stage: str,
+        status: str,
+        code: str = "OK",
+        details: Optional[dict[str, Any]] = None,
+    ) -> None:
+        """Emit append-only newline-delimited JSON telemetry event to output/events.jsonl."""
+        try:
+            out_p = Path(output_dir)
+            out_p.mkdir(parents=True, exist_ok=True)
+            event_file = out_p / "events.jsonl"
+            rec = {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "stage": stage,
+                "status": status,
+                "code": code,
+                "details": details or {},
+            }
+            with open(event_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps(rec) + "\n")
+        except Exception:
+            pass
+
+    @staticmethod
+    def write_error_payload(
+        output_dir: Union[str, Path],
+        error_code: str,
+        stage: str,
+        message: str,
+        hint: str,
+        details: Optional[dict[str, Any]] = None,
+    ) -> None:
+        """Cleanly serialize error payload with actionable remediation hints."""
+        try:
+            out_p = Path(output_dir)
+            out_p.mkdir(parents=True, exist_ok=True)
+            err_file = out_p / "error.json"
+            payload = {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "error_code": error_code,
+                "stage": stage,
+                "message": message,
+                "hint": hint,
+                "details": details or {},
+            }
+            err_file.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        except Exception:
+            pass
+
+    @staticmethod
+    def _diagnose_exception(exc: Exception) -> tuple[str, str]:
+        """Map exception to structured error code and actionable remediation hint."""
+        exc_type = type(exc).__name__
+        if exc_type == "DatasetIntegrityError":
+            return (
+                "ERR_DATASET_CHECKSUM_MISMATCH",
+                "Dataset failed cryptographic SHA-256 verification or was not found in cache. Re-fetch or verify ground-truth dataset checksum.",
+            )
+        if exc_type == "UnauthorizedExecutionMutation":
+            return (
+                "ERR_UNAUTHORIZED_MUTATION",
+                "Child execution arguments (seed, knobs, or code) mutated from parent gate authorization. Mint fresh delegation token for modified configuration.",
+            )
+        if exc_type == "EntrypointResolutionError":
+            return (
+                "ERR_ENTRYPOINT_RESOLUTION",
+                "Entry point script was not found on disk or was unreadable. Verify file path and permissions in code directory.",
+            )
+        if exc_type == "EpistemicHonestyViolation":
+            return (
+                "ERR_EPISTEMIC_HONESTY_VIOLATION",
+                "Domain declaring physical/biological/neural properties attempted PRNG state mocking without recognized numerical engines.",
+            )
+        if exc_type == "SandboxSecurityViolation":
+            return (
+                "ERR_SANDBOX_SECURITY_VIOLATION",
+                "Code breached filesystem jail confinement, attempted unauthorized imports, or modified files outside sandbox.",
+            )
+        if isinstance(exc, PermissionError):
+            return (
+                "ERR_GATE_UNAUTHORIZED",
+                "Human gate authorization token is missing, expired, self-signed, or rejected.",
+            )
+        if isinstance(exc, subprocess.TimeoutExpired):
+            return (
+                "ERR_PROCESS_TIMEOUT",
+                "Subprocess exceeded enforced execution timeout boundary. Increase spec.timeout_seconds.",
+            )
+        if "tectonic" in exc_type.lower() or "tectonic" in str(exc).lower() or "latex" in str(exc).lower():
+            return (
+                "ERR_TECTONIC_FAILURE",
+                "LaTeX or Tectonic compilation failed. Verify tectonic binary availability and LaTeX AST syntax.",
+            )
+        return (
+            "ERR_EXECUTION_FAILURE",
+            "Unexpected sandbox error occurred during execution lifecycle.",
+        )
 
     def _sanitize_environment(self, overrides: Optional[dict[str, str]] = None) -> dict[str, str]:
         """Produce a clean, isolated environment dictionary with all credentials removed."""
@@ -522,312 +624,458 @@ class PolicySubprocessRunner:
             PermissionError: If gate_token is not approved, has expired, or fails cryptographic spec binding.
             SandboxSecurityViolation: If code breaches filesystem confinement or Rule 15.
         """
-        # 1. Mandatory Rule 3 Gate Check & Canonical Spec Binding
-        if not gate_token.is_approved():
-            raise PermissionError(
-                f"Rule 3 Gate Violation: Execution blocked. HumanGateToken '{gate_token.gate_id}' "
-                f"is in state '{gate_token.status}' (must be APPROVED)."
-            )
-
-        now = datetime.now(timezone.utc)
-        if gate_token.expires_at and now > gate_token.expires_at:
-            raise PermissionError(
-                f"Rule 3 Gate Violation: HumanGateToken '{gate_token.gate_id}' has expired. Re-authorization required."
-            )
-
-        # Zero-Trust Cryptographic Invariant: ONLY Ed25519 asymmetric signatures verified against active public key
-        if (
-            not gate_token.authorization_signature
-            or not gate_token.public_key_hex
-            or gate_token.public_key_hex == "hmac-sha256"
-            or len(gate_token.public_key_hex) != 64
-        ):
-            raise PermissionError("Ed25519 authorization required; fallback tokens strictly forbidden")
-
         code_path = Path(code_dir).resolve()
         output_path = Path(output_dir).resolve()
         code_path.mkdir(parents=True, exist_ok=True)
         output_path.mkdir(parents=True, exist_ok=True)
 
-        # Triple SHA-256 Binding Check (Directive 3)
-        if gate_token.payload.get("code_sha256"):
-            actual_code_hash = compute_code_hash(code_path, spec.entry_point)
-            if actual_code_hash != gate_token.payload["code_sha256"]:
-                raise PermissionError(
-                    f"Rule 3 Gate Violation: Code in '{code_dir}' was altered after approval! "
-                    f"Cryptographic code SHA-256 mismatch (expected {gate_token.payload['code_sha256']}, got {actual_code_hash})."
-                )
-
-        if gate_token.payload.get("config_sha256"):
-            actual_cfg_hash = compute_config_hash(spec)
-            if actual_cfg_hash != gate_token.payload["config_sha256"]:
-                raise PermissionError(
-                    f"Rule 3 Gate Violation: Experiment configuration was altered after approval! "
-                    f"Cryptographic config SHA-256 mismatch (expected {gate_token.payload['config_sha256']}, got {actual_cfg_hash})."
-                )
-
-        from research_os.gate.approval import get_key_backend
-        trusted_pub = get_key_backend().get_public_key_hex()
-        if not verify_approval_token(
-            gate_token,
-            expected_spec=spec,
-            expected_public_key_hex=trusted_pub,
-            expected_code_dir=code_path,
-            consume_nonce=True,
-        ):
-            raise PermissionError(
-                "Rule 3 Gate Violation: Spec altered after approval, self-signed/unpinned key used, "
-                "or cryptographic token invalid/replayed."
-            )
-
-        # 2. Static Code Security Validation (Rule 15) & Anti-Fabrication Invariant
-        violations = self.validate_code_security(code_path)
-        if violations:
-            raise SandboxSecurityViolation(
-                f"Rule 15 Security Violation: Code failed sandboxed filesystem confinement checks:\n"
-                + "\n".join(f"  - {v}" for v in violations)
-            )
-
-        from research_os.sandbox.verification import verify_anti_fabrication
-        declared_domain = spec.run_config.get("domain") or getattr(spec, "domain", None)
-        if declared_domain:
-            for py_file in code_path.glob("**/*.py"):
-                verify_anti_fabrication(py_file, domain=declared_domain)
-
-        # 3. Snapshot parent run directory
-        parent_dir = code_path.parent
-        pre_files = {p: p.stat().st_mtime for p in parent_dir.rglob("*") if p.is_file()} if parent_dir.exists() else {}
-
-        # 4. Write runtime config if needed
-        config_path = code_path / "config.json"
-        if not config_path.exists() and spec.run_config:
-            config_path.write_text(json.dumps(spec.run_config, indent=2), encoding="utf-8")
-
-        # 5. Environment Sanitization & Credential Shielding
-        clean_env = self._sanitize_environment(env_overrides)
-
-        # 6. Resolve command & arguments with pre-flight entry point verification (Directive 2)
-        cmd = self._resolve_command(
-            spec.entry_point,
-            code_path,
-            output_path,
-            expected_sha256=spec.run_config.get("entry_point_sha256"),
-        )
-        timeout = timeout_seconds or spec.effective_timeout_seconds or self.default_timeout_seconds
-
-        start_time = time.perf_counter()
-        proc = None
-        job_handle = None
-        timed_out = False
-        stdout_text = ""
-        stderr_text = ""
-        exit_code = -1
-        resource_enforcement = "UNENFORCED_RESOURCE_LIMIT"
-        execution_confinement_method = "PSUTIL_WATCHDOG_FALLBACK"
-        error_details = None
-
-        # Enforced caps
-        max_ram = getattr(spec, "enforced_max_ram_gb", 4.0)
-        max_cpu = getattr(spec, "effective_max_cpu_seconds", None)
-        if max_cpu is None and spec.resource_limits:
-            max_cpu = spec.resource_limits.max_cpu_seconds
-
-        stop_watchdog = threading.Event()
-        violation_info: dict[str, Any] = {}
-        watchdog_thread = None
-        cleanup_fn = None
-
+        current_stage = "PREFLIGHT"
         try:
-            popen_kwargs: dict[str, Any] = {
-                "cwd": str(code_path),
-                "env": clean_env,
-                "stdout": subprocess.PIPE,
-                "stderr": subprocess.PIPE,
-                "text": True,
-                "encoding": "utf-8",
-                "errors": "replace",
-            }
-            if os.name != "nt":
-                popen_kwargs["start_new_session"] = True
-
-            proc = subprocess.Popen(cmd, **popen_kwargs)
-
-            # Apply OS-level resource constraints (Windows Job Object / Linux rlimit)
-            confinement_method, job_handle = self._apply_os_resource_limits(proc, max_ram_gb=max_ram)
-            resource_enforcement = confinement_method
-            execution_confinement_method = confinement_method
-
-            # Defensive Windows fallback cleanup handler registration
-            if confinement_method == "PSUTIL_WATCHDOG_FALLBACK" and sys.platform == "win32":
-                import atexit
-                target_pid = proc.pid
-                cleanup_fn = lambda: subprocess.run(
-                    ["taskkill", "/F", "/T", "/PID", str(target_pid)],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-                atexit.register(cleanup_fn)
-
-            # Active psutil resource watchdog daemon thread
-            watchdog_thread = threading.Thread(
-                target=self._enforce_resource_watchdog,
-                args=(proc, max_ram, max_cpu, stop_watchdog, violation_info, job_handle),
-                daemon=True,
-                name="resource_watchdog",
+            self.emit_event(
+                output_path,
+                stage="PREFLIGHT",
+                status="RUNNING",
+                code="STAGE_START",
+                details={"spec_id": spec.spec_id},
             )
-            watchdog_thread.start()
 
-            stdout_text, stderr_text = proc.communicate(timeout=timeout)
-            exit_code = proc.returncode
-        except subprocess.TimeoutExpired:
-            timed_out = True
-            if proc:
-                try:
-                    # Windows Job Object process tree termination
-                    if os.name == "nt" and job_handle:
-                        import ctypes
-                        ctypes.windll.kernel32.TerminateJobObject(job_handle, 124)
-                        ctypes.windll.kernel32.CloseHandle(job_handle)
-                        job_handle = None
-                    elif os.name != "nt":
+            # 1. Mandatory Rule 3 Gate Check & Canonical Spec Binding
+            if not gate_token.is_approved():
+                raise PermissionError(
+                    f"Rule 3 Gate Violation: Execution blocked. HumanGateToken '{gate_token.gate_id}' "
+                    f"is in state '{gate_token.status}' (must be APPROVED)."
+                )
+
+            now = datetime.now(timezone.utc)
+            if gate_token.expires_at and now > gate_token.expires_at:
+                raise PermissionError(
+                    f"Rule 3 Gate Violation: HumanGateToken '{gate_token.gate_id}' has expired. Re-authorization required."
+                )
+
+            # Zero-Trust Cryptographic Invariant: ONLY Ed25519 asymmetric signatures verified against active public key
+            if (
+                not gate_token.authorization_signature
+                or not gate_token.public_key_hex
+                or gate_token.public_key_hex == "hmac-sha256"
+                or len(gate_token.public_key_hex) != 64
+            ):
+                raise PermissionError("Ed25519 authorization required; fallback tokens strictly forbidden")
+
+            # Zero-Trust Invariant: Child Token Execution Identity Verification (Task 2)
+            if gate_token.payload.get("child_execution_hash"):
+                expected_child_hash = gate_token.payload["child_execution_hash"]
+                expected_seed = gate_token.payload.get("seed")
+                expected_grid_params = gate_token.payload.get("grid_cell_params") or {}
+                parent_spec_hash = (
+                    gate_token.payload.get("parent_spec_hash")
+                    or gate_token.payload.get("canonical_spec_hash")
+                )
+
+                actual_code_hash = compute_code_hash(code_path, spec.entry_point)
+
+                # 1. Verify seed match
+                active_seed = None
+                if spec.run_config.get("seed") is not None:
+                    active_seed = spec.run_config["seed"]
+                elif spec.random_seeds and len(spec.random_seeds) == 1:
+                    active_seed = spec.random_seeds[0]
+
+                cfg_path = code_path / "config.json"
+                cfg_data = {}
+                if cfg_path.exists():
+                    try:
+                        cfg_data = json.loads(cfg_path.read_text(encoding="utf-8"))
+                        if "seed" in cfg_data:
+                            active_seed = cfg_data["seed"]
+                    except Exception:
+                        pass
+
+                parts = shlex.split(spec.entry_point, posix=(os.name != "nt"))
+                for i, p in enumerate(parts):
+                    if p == "--seed" and i + 1 < len(parts):
                         try:
-                            import signal
-                            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-                        except Exception:
+                            active_seed = int(parts[i + 1])
+                        except (ValueError, TypeError):
                             pass
 
-                    # Process tree kill defense-in-depth on Windows
-                    if os.name == "nt":
-                        try:
-                            subprocess.run(
-                                ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
-                                stdout=subprocess.DEVNULL,
-                                stderr=subprocess.DEVNULL,
-                                timeout=5,
-                            )
-                        except Exception:
-                            pass
+                if expected_seed is not None and active_seed is not None and int(active_seed) != int(expected_seed):
+                    raise UnauthorizedExecutionMutation(
+                        f"Child execution altered seed! Token expected seed {expected_seed}, "
+                        f"but active execution is configured with seed {active_seed}."
+                    )
 
-                    proc.kill()
-                    stdout_text, stderr_text = proc.communicate(timeout=5)
-                except Exception:
-                    pass
-            exit_code = 124
-            stderr_text += f"\n[Sandbox Error] Execution exceeded hard timeout limit of {timeout}s and process tree was terminated."
-        except SandboxSecurityViolation:
-            raise
-        except Exception as exc:
-            exit_code = 1
-            stderr_text += f"\n[Sandbox Error] Process spawning error: {exc}"
-        finally:
-            stop_watchdog.set()
-            if watchdog_thread:
-                watchdog_thread.join(timeout=0.5)
+                # 2. Verify runtime parameters / knob combinations
+                for knob_k, knob_v in expected_grid_params.items():
+                    if knob_k in spec.run_config and spec.run_config[knob_k] != knob_v:
+                        raise UnauthorizedExecutionMutation(
+                            f"Child execution altered parameter '{knob_k}'! Token expected {knob_v}, "
+                            f"but spec.run_config has {spec.run_config[knob_k]}."
+                        )
+                    if knob_k in cfg_data and cfg_data[knob_k] != knob_v:
+                        raise UnauthorizedExecutionMutation(
+                            f"Child execution altered parameter '{knob_k}' in config.json! "
+                            f"Token expected {knob_v}, but found {cfg_data[knob_k]}."
+                        )
 
-            if cleanup_fn is not None and sys.platform == "win32":
-                try:
-                    import atexit
-                    atexit.unregister(cleanup_fn)
-                except Exception:
-                    pass
+                # Verify configuration hash for child token
+                if gate_token.payload.get("config_sha256"):
+                    actual_cfg_hash = compute_config_hash(spec)
+                    if actual_cfg_hash != gate_token.payload["config_sha256"]:
+                        raise UnauthorizedExecutionMutation(
+                            f"Child execution altered experiment configuration! Cryptographic config SHA-256 mismatch."
+                        )
 
-            if os.name == "nt" and job_handle:
-                try:
-                    import ctypes
-                    ctypes.windll.kernel32.CloseHandle(job_handle)
-                except Exception:
-                    pass
+                # Verify code hash for child token
+                if gate_token.payload.get("code_sha256"):
+                    if actual_code_hash != gate_token.payload["code_sha256"]:
+                        raise UnauthorizedExecutionMutation(
+                            f"Child execution altered code! Cryptographic code SHA-256 mismatch."
+                        )
 
-        # Post-execution check for resource watchdog violation or Windows Job Object OOM
-        if violation_info.get("type") == "OOM":
-            exit_code = 137
+                # 3. Cryptographically recompute and verify child_execution_hash
+                recomputed_child_hash = compute_child_execution_hash(
+                    parent_spec_hash=parent_spec_hash,
+                    grid_cell_params=expected_grid_params,
+                    seed=expected_seed,
+                    code_hash=actual_code_hash,
+                )
+                if recomputed_child_hash != expected_child_hash:
+                    raise UnauthorizedExecutionMutation(
+                        f"Child execution hash mismatch! Expected {expected_child_hash}, "
+                        f"recomputed {recomputed_child_hash}. Code, seed, or parameters altered."
+                    )
+            else:
+                # Triple SHA-256 Binding Check for parent/standalone execution
+                if gate_token.payload.get("code_sha256"):
+                    actual_code_hash = compute_code_hash(code_path, spec.entry_point)
+                    if actual_code_hash != gate_token.payload["code_sha256"]:
+                        raise PermissionError(
+                            f"Rule 3 Gate Violation: Code in '{code_dir}' was altered after approval! "
+                            f"Cryptographic code SHA-256 mismatch (expected {gate_token.payload['code_sha256']}, got {actual_code_hash})."
+                        )
+
+                if gate_token.payload.get("config_sha256"):
+                    actual_cfg_hash = compute_config_hash(spec)
+                    if actual_cfg_hash != gate_token.payload["config_sha256"]:
+                        raise PermissionError(
+                            f"Rule 3 Gate Violation: Experiment configuration was altered after approval! "
+                            f"Cryptographic config SHA-256 mismatch (expected {gate_token.payload['config_sha256']}, got {actual_cfg_hash})."
+                        )
+
+            from research_os.gate.approval import get_key_backend
+            trusted_pub = get_key_backend().get_public_key_hex()
+            if not verify_approval_token(
+                gate_token,
+                expected_spec=spec,
+                expected_public_key_hex=trusted_pub,
+                expected_code_dir=code_path,
+                consume_nonce=True,
+            ):
+                raise PermissionError(
+                    "Rule 3 Gate Violation: Spec altered after approval, self-signed/unpinned key used, "
+                    "or cryptographic token invalid/replayed."
+                )
+
+            current_stage = "SECURITY_CHECK"
+            self.emit_event(output_path, stage="SECURITY_CHECK", status="RUNNING", code="AST_SCANNING")
+
+            # 2. Static Code Security Validation (Rule 15) & Anti-Fabrication Invariant
+            violations = self.validate_code_security(code_path)
+            if violations:
+                raise SandboxSecurityViolation(
+                    f"Rule 15 Security Violation: Code failed sandboxed filesystem confinement checks:\n"
+                    + "\n".join(f"  - {v}" for v in violations)
+                )
+
+            from research_os.sandbox.verification import verify_anti_fabrication
+            declared_domain = spec.run_config.get("domain") or getattr(spec, "domain", None)
+            if declared_domain:
+                for py_file in code_path.glob("**/*.py"):
+                    verify_anti_fabrication(py_file, domain=declared_domain)
+
+            # 3. Snapshot parent run directory
+            parent_dir = code_path.parent
+            pre_files = {p: p.stat().st_mtime for p in parent_dir.rglob("*") if p.is_file()} if parent_dir.exists() else {}
+
+            # 4. Write runtime config if needed
+            config_path = code_path / "config.json"
+            if not config_path.exists() and spec.run_config:
+                config_path.write_text(json.dumps(spec.run_config, indent=2), encoding="utf-8")
+
+            # 5. Environment Sanitization & Credential Shielding
+            clean_env = self._sanitize_environment(env_overrides)
+
+            # 6. Resolve command & arguments with pre-flight entry point verification (Directive 2)
+            current_stage = "COMMAND_RESOLUTION"
+            cmd = self._resolve_command(
+                spec.entry_point,
+                code_path,
+                output_path,
+                expected_sha256=spec.run_config.get("entry_point_sha256"),
+            )
+            timeout = timeout_seconds or spec.effective_timeout_seconds or self.default_timeout_seconds
+
+            current_stage = "SUBPROCESS_EXECUTION"
+            self.emit_event(
+                output_path,
+                stage="SUBPROCESS_EXECUTION",
+                status="RUNNING",
+                code="PROCESS_SPAWN",
+                details={"cmd": cmd, "timeout": timeout},
+            )
+
+            start_time = time.perf_counter()
+            proc = None
+            job_handle = None
             timed_out = False
-            error_details = violation_info.get("error_details", "ResourceLimitExceeded: Process exceeded enforced_max_ram_gb")
-            stderr_text += f"\n[Sandbox Error] {error_details}"
-        elif violation_info.get("type") == "CPU":
-            exit_code = 137
-            timed_out = False
-            error_details = violation_info.get("error_details", "ResourceLimitExceeded: Process exceeded max_cpu_seconds")
-            stderr_text += f"\n[Sandbox Error] {error_details}"
-        elif exit_code in (-1073741804, 3221225540, 0xC0000044):
-            # Windows STATUS_QUOTA_EXCEEDED from Job Object
-            exit_code = 137
-            timed_out = False
-            error_details = "ResourceLimitExceeded: Process exceeded enforced_max_ram_gb"
-            stderr_text += f"\n[Sandbox Error] {error_details}"
+            stdout_text = ""
+            stderr_text = ""
+            exit_code = -1
+            resource_enforcement = "UNENFORCED_RESOURCE_LIMIT"
+            execution_confinement_method = "PSUTIL_WATCHDOG_FALLBACK"
+            error_details = None
 
-        duration = round(time.perf_counter() - start_time, 3)
+            # Enforced caps
+            max_ram = getattr(spec, "enforced_max_ram_gb", 4.0)
+            max_cpu = getattr(spec, "effective_max_cpu_seconds", None)
+            if max_cpu is None and spec.resource_limits:
+                max_cpu = spec.resource_limits.max_cpu_seconds
 
-        # 7. Post-run filesystem jail verification (Rule 15)
-        if parent_dir.exists():
-            for p in parent_dir.rglob("*"):
-                if p.is_file():
-                    in_code = False
-                    in_output = False
-                    try:
-                        p.relative_to(code_path)
-                        in_code = True
-                    except ValueError:
-                        pass
-                    try:
-                        p.relative_to(output_path)
-                        in_output = True
-                    except ValueError:
-                        pass
-                    if not (in_code or in_output):
-                        if p not in pre_files or p.stat().st_mtime != pre_files[p]:
-                            raise SandboxSecurityViolation(
-                                f"Rule 15 Filesystem Jail Breach: Process wrote or modified unauthorized file outside sandbox: {p}"
-                            )
+            stop_watchdog = threading.Event()
+            violation_info: dict[str, Any] = {}
+            watchdog_thread = None
+            cleanup_fn = None
 
-        # 8. Save logs to output_dir
-        (output_path / "stdout.log").write_text(stdout_text, encoding="utf-8")
-        (output_path / "stderr.log").write_text(stderr_text, encoding="utf-8")
-
-        # 9. Authenticated Artifact Manifest: Seal manifest.json post-execution
-        from research_os.verify.deterministic import create_run_manifest
-        create_run_manifest(output_path)
-
-        # 10. Directive 3 Fail-Closed: Check for undeclared metric spoofing in metrics.json
-        metrics_file = output_path / "metrics.json"
-        if metrics_file.exists():
             try:
-                metrics_data = json.loads(metrics_file.read_text(encoding="utf-8"))
-                if isinstance(metrics_data, dict):
-                    declared = set(getattr(spec, "declared_metrics", []) or [])
-                    if not declared and "declared_metrics" in spec.run_config:
-                        declared = set(spec.run_config["declared_metrics"])
-                    if not declared:
-                        for c_name in ("contract.json", "contract.yaml", "contract.yml"):
-                            c_path = code_path / c_name
-                            if c_path.exists():
-                                from research_os.specs.contracts import inspect_experiment_contract
-                                c_info = inspect_experiment_contract(code_path)
-                                if c_info.metrics:
-                                    declared = set(c_info.metrics.keys())
-                                break
-                    if declared:
-                        emitted_keys = [k for k in metrics_data.keys() if k not in ("status", "_provenance")]
-                        undeclared = [k for k in emitted_keys if k not in declared]
-                        if undeclared:
-                            raise SandboxSecurityViolation(
-                                f"UndeclaredMetricSpoofingError: Runner emitted undeclared metrics {undeclared} "
-                                f"violating contract boundary. Allowed: {sorted(list(declared))}."
-                            )
-            except json.JSONDecodeError:
-                pass
+                popen_kwargs: dict[str, Any] = {
+                    "cwd": str(code_path),
+                    "env": clean_env,
+                    "stdout": subprocess.PIPE,
+                    "stderr": subprocess.PIPE,
+                    "text": True,
+                    "encoding": "utf-8",
+                    "errors": "replace",
+                }
+                if os.name != "nt":
+                    popen_kwargs["start_new_session"] = True
 
-        return SandboxExecutionResult(
-            exit_code=exit_code,
-            stdout=stdout_text,
-            stderr=stderr_text,
-            duration_seconds=duration,
-            timed_out=timed_out,
-            resource_enforcement=resource_enforcement,
-            execution_confinement_method=execution_confinement_method,
-            error=stderr_text if exit_code != 0 else None,
-            error_details=error_details,
-        )
+                proc = subprocess.Popen(cmd, **popen_kwargs)
+
+                # Apply OS-level resource constraints (Windows Job Object / Linux rlimit)
+                confinement_method, job_handle = self._apply_os_resource_limits(proc, max_ram_gb=max_ram)
+                resource_enforcement = confinement_method
+                execution_confinement_method = confinement_method
+
+                # Defensive Windows fallback cleanup handler registration
+                if confinement_method == "PSUTIL_WATCHDOG_FALLBACK" and sys.platform == "win32":
+                    import atexit
+                    target_pid = proc.pid
+                    cleanup_fn = lambda: subprocess.run(
+                        ["taskkill", "/F", "/T", "/PID", str(target_pid)],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    atexit.register(cleanup_fn)
+
+                # Active psutil resource watchdog daemon thread
+                watchdog_thread = threading.Thread(
+                    target=self._enforce_resource_watchdog,
+                    args=(proc, max_ram, max_cpu, stop_watchdog, violation_info, job_handle),
+                    daemon=True,
+                    name="resource_watchdog",
+                )
+                watchdog_thread.start()
+
+                stdout_text, stderr_text = proc.communicate(timeout=timeout)
+                exit_code = proc.returncode
+            except subprocess.TimeoutExpired:
+                timed_out = True
+                if proc:
+                    try:
+                        # Windows Job Object process tree termination
+                        if os.name == "nt" and job_handle:
+                            import ctypes
+                            ctypes.windll.kernel32.TerminateJobObject(job_handle, 124)
+                            ctypes.windll.kernel32.CloseHandle(job_handle)
+                            job_handle = None
+                        elif os.name != "nt":
+                            try:
+                                import signal
+                                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                            except Exception:
+                                pass
+
+                        # Process tree kill defense-in-depth on Windows
+                        if os.name == "nt":
+                            try:
+                                subprocess.run(
+                                    ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                                    stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL,
+                                    timeout=5,
+                                )
+                            except Exception:
+                                pass
+
+                        proc.kill()
+                        stdout_text, stderr_text = proc.communicate(timeout=5)
+                    except Exception:
+                        pass
+                exit_code = 124
+                stderr_text += f"\n[Sandbox Error] Execution exceeded hard timeout limit of {timeout}s and process tree was terminated."
+            except SandboxSecurityViolation:
+                raise
+            except Exception as exc:
+                exit_code = 1
+                stderr_text += f"\n[Sandbox Error] Process spawning error: {exc}"
+            finally:
+                stop_watchdog.set()
+                if watchdog_thread:
+                    watchdog_thread.join(timeout=0.5)
+
+                if cleanup_fn is not None and sys.platform == "win32":
+                    try:
+                        import atexit
+                        atexit.unregister(cleanup_fn)
+                    except Exception:
+                        pass
+
+                if os.name == "nt" and job_handle:
+                    try:
+                        import ctypes
+                        ctypes.windll.kernel32.CloseHandle(job_handle)
+                    except Exception:
+                        pass
+
+            # Post-execution check for resource watchdog violation or Windows Job Object OOM
+            if violation_info.get("type") == "OOM":
+                exit_code = 137
+                timed_out = False
+                error_details = violation_info.get("error_details", "ResourceLimitExceeded: Process exceeded enforced_max_ram_gb")
+                stderr_text += f"\n[Sandbox Error] {error_details}"
+            elif violation_info.get("type") == "CPU":
+                exit_code = 137
+                timed_out = False
+                error_details = violation_info.get("error_details", "ResourceLimitExceeded: Process exceeded max_cpu_seconds")
+                stderr_text += f"\n[Sandbox Error] {error_details}"
+            elif exit_code in (-1073741804, 3221225540, 0xC0000044):
+                # Windows STATUS_QUOTA_EXCEEDED from Job Object
+                exit_code = 137
+                timed_out = False
+                error_details = "ResourceLimitExceeded: Process exceeded enforced_max_ram_gb"
+                stderr_text += f"\n[Sandbox Error] {error_details}"
+
+            duration = round(time.perf_counter() - start_time, 3)
+
+            # 7. Post-run filesystem jail verification (Rule 15)
+            current_stage = "JAIL_VERIFICATION"
+            if parent_dir.exists():
+                for p in parent_dir.rglob("*"):
+                    if p.is_file():
+                        in_code = False
+                        in_output = False
+                        try:
+                            p.relative_to(code_path)
+                            in_code = True
+                        except ValueError:
+                            pass
+                        try:
+                            p.relative_to(output_path)
+                            in_output = True
+                        except ValueError:
+                            pass
+                        if not (in_code or in_output):
+                            if p not in pre_files or p.stat().st_mtime != pre_files[p]:
+                                raise SandboxSecurityViolation(
+                                    f"Rule 15 Filesystem Jail Breach: Process wrote or modified unauthorized file outside sandbox: {p}"
+                                )
+
+            # 8. Save logs to output_dir
+            (output_path / "stdout.log").write_text(stdout_text, encoding="utf-8")
+            (output_path / "stderr.log").write_text(stderr_text, encoding="utf-8")
+
+            # 9. Authenticated Artifact Manifest: Seal manifest.json post-execution
+            current_stage = "MANIFEST_SEALING"
+            from research_os.verify.deterministic import create_run_manifest
+            create_run_manifest(output_path)
+
+            # 10. Directive 3 Fail-Closed: Check for undeclared metric spoofing in metrics.json
+            metrics_file = output_path / "metrics.json"
+            if metrics_file.exists():
+                try:
+                    metrics_data = json.loads(metrics_file.read_text(encoding="utf-8"))
+                    if isinstance(metrics_data, dict):
+                        declared = set(getattr(spec, "declared_metrics", []) or [])
+                        if not declared and "declared_metrics" in spec.run_config:
+                            declared = set(spec.run_config["declared_metrics"])
+                        if not declared:
+                            for c_name in ("contract.json", "contract.yaml", "contract.yml"):
+                                c_path = code_path / c_name
+                                if c_path.exists():
+                                    from research_os.specs.contracts import inspect_experiment_contract
+                                    c_info = inspect_experiment_contract(code_path)
+                                    if c_info.metrics:
+                                        declared = set(c_info.metrics.keys())
+                                    break
+                        if declared:
+                            emitted_keys = [k for k in metrics_data.keys() if k not in ("status", "_provenance")]
+                            undeclared = [k for k in emitted_keys if k not in declared]
+                            if undeclared:
+                                raise SandboxSecurityViolation(
+                                    f"UndeclaredMetricSpoofingError: Runner emitted undeclared metrics {undeclared} "
+                                    f"violating contract boundary. Allowed: {sorted(list(declared))}."
+                                )
+                except json.JSONDecodeError:
+                    pass
+
+            self.emit_event(
+                output_path,
+                stage="SUBPROCESS_EXECUTION",
+                status="COMPLETED" if exit_code == 0 else "FAILED",
+                code="PROCESS_EXIT_OK" if exit_code == 0 else "PROCESS_EXIT_NONZERO",
+                details={"exit_code": exit_code, "duration_seconds": duration, "timed_out": timed_out},
+            )
+
+            if exit_code != 0:
+                self.write_error_payload(
+                    output_path,
+                    error_code="ERR_PROCESS_EXIT_NONZERO",
+                    stage="SUBPROCESS_EXECUTION",
+                    message=f"Process exited with non-zero code {exit_code}.",
+                    hint="Check output/stderr.log in the run directory for error tracebacks.",
+                    details={"exit_code": exit_code, "timed_out": timed_out, "error_details": error_details},
+                )
+
+            return SandboxExecutionResult(
+                exit_code=exit_code,
+                stdout=stdout_text,
+                stderr=stderr_text,
+                duration_seconds=duration,
+                timed_out=timed_out,
+                resource_enforcement=resource_enforcement,
+                execution_confinement_method=execution_confinement_method,
+                error=stderr_text if exit_code != 0 else None,
+                error_details=error_details,
+            )
+
+        except Exception as exc:
+            err_code, hint = self._diagnose_exception(exc)
+            self.emit_event(
+                output_path,
+                stage=current_stage,
+                status="FAILED",
+                code=err_code,
+                details={"error": str(exc), "remediation_hint": hint},
+            )
+            self.write_error_payload(
+                output_path,
+                error_code=err_code,
+                stage=current_stage,
+                message=str(exc),
+                hint=hint,
+                details={"exception_type": type(exc).__name__},
+            )
+            raise
 
 
 # Backward-compatible alias

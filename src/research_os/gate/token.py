@@ -10,8 +10,10 @@ from typing import Any, Optional
 
 from research_os.gate.approval import (
     KeyBackend,
+    UnauthorizedExecutionMutation,
     canonicalize_gate_payload,
     compute_canonical_spec_hash,
+    compute_child_execution_hash,
     generate_keyed_signature,
     get_default_signing_key,
     get_key_backend,
@@ -176,6 +178,7 @@ class HumanGateTokenManager:
         seed_spec: ExperimentSpec,
         seed_code_dir: Any,
         actual_seed_id: str,
+        grid_cell_params: Optional[dict[str, Any]] = None,
     ) -> HumanGateToken:
         """Derive an attested child token for a specific seed under parent authorization."""
         return mint_child_delegation_token(
@@ -184,6 +187,7 @@ class HumanGateTokenManager:
             seed_spec=seed_spec,
             seed_code_dir=seed_code_dir,
             actual_seed_id=actual_seed_id,
+            grid_cell_params=grid_cell_params,
             private_key=self._private_key,
         )
 

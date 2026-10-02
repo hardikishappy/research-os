@@ -1,6 +1,6 @@
 # Empirical Finding: Retrieval-Augmented Generation vs Direct Generation on Hallucination Frequency [CONFIRMED]
 
-**Evaluation ID:** `eval-run-8bbde015-c0` | **Verdict:** `CONFIRMED`
+**Evaluation ID:** `eval-run-af1fb5b5-c0` | **Verdict:** `CONFIRMED`
 
 ## Abstract
 Empirical testing of hypothesis 'Retrieval-Augmented Generation vs Direct Generation on Hallucination Frequency' across 2 random seeds. Outcome: CONFIRMED. Rationale: Hypothesis CONFIRMED across 2 seeds: Mean observed hallucination_rate = 0.1 (std_err=0.1) satisfied threshold <= 0.2.
@@ -18,7 +18,7 @@ Empirical Multi-Seed Observations:
 - **shuffled_hallucination_rate**: mean = 0.60 (std_dev = 0.00, std_err = 0.00), target >= 0.0 -> PASS
 - **hallucination_reduction_pct**: mean = 85.72 (std_dev = 20.20, std_err = 14.29), target >= 0.0 -> PASS
 - **token_overlap_score**: mean = 0.94 (std_dev = 0.08, std_err = 0.06), target >= 0.0 -> PASS
-- **latency_ms**: mean = 1.97 (std_dev = 0.29, std_err = 0.20), target >= 0.0 -> PASS
+- **latency_ms**: mean = 1.80 (std_dev = 0.02, std_err = 0.01), target >= 0.0 -> PASS
 - **total_evaluated_queries**: mean = 10.00 (std_dev = 0.00, std_err = 0.00), target >= 0.0 -> PASS
 
 ## Conclusion
