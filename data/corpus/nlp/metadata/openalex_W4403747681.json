@@ -1,0 +1,18 @@
+{
+  "paper_id": "openalex_W4403747681",
+  "title": "Retrieval-Augmented Test Generation: How Far Are We?",
+  "authors": [
+    "Jiho Shin",
+    "Nima Shiri Harzevili",
+    "Reem Aleithan",
+    "Hadi Hemmati",
+    "Song Wang"
+  ],
+  "abstract": "Retrieval Augmented Generation (RAG) has advanced software engineering tasks but remains underexplored in unit test generation. To bridge this gap, we investigate the efficacy of RAG-based unit test generation for machine learning (ML/DL) APIs and analyze the impact of different knowledge sources on their effectiveness.",
+  "year": 2026,
+  "venue": null,
+  "doi": "https://doi.org/10.1145/3744916.3773163",
+  "arxiv_id": null,
+  "url": "https://doi.org/10.1145/3744916.3773163",
+  "citation_count": 4
+}

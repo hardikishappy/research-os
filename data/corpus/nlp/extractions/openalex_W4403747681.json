@@ -1,0 +1,47 @@
+{
+  "extraction_id": "ext_openalex_W4403747681",
+  "paper_id": "openalex_W4403747681",
+  "metadata": {
+    "paper_id": "openalex_W4403747681",
+    "title": "Retrieval-Augmented Test Generation: How Far Are We?",
+    "authors": [
+      "Jiho Shin",
+      "Nima Shiri Harzevili",
+      "Reem Aleithan",
+      "Hadi Hemmati",
+      "Song Wang"
+    ],
+    "abstract": "Retrieval Augmented Generation (RAG) has advanced software engineering tasks but remains underexplored in unit test generation. To bridge this gap, we investigate the efficacy of RAG-based unit test generation for machine learning (ML/DL) APIs and analyze the impact of different knowledge sources on their effectiveness.",
+    "year": 2026,
+    "venue": null,
+    "doi": "https://doi.org/10.1145/3744916.3773163",
+    "arxiv_id": null,
+    "url": "https://doi.org/10.1145/3744916.3773163",
+    "citation_count": 4
+  },
+  "sections": {
+    "Abstract": "Retrieval Augmented Generation (RAG) has advanced software engineering tasks but remains underexplored in unit test generation. To bridge this gap, we investigate the efficacy of RAG-based unit test generation for machine learning (ML/DL) APIs and analyze the impact of different knowledge sources on their effectiveness.",
+    "Introduction": "This study explores Retrieval-Augmented Test Generation: How Far Are We?."
+  },
+  "section_provenance": [
+    {
+      "source_paper_id": "openalex_W4403747681",
+      "section_title": "Abstract",
+      "section_index": 0,
+      "page_start": null,
+      "page_end": null,
+      "text_snippet": "Retrieval Augmented Generation (RAG) has advanced software engineering tasks but remains underexplored in unit test generation. To bridge this gap, we investigate the efficacy of RAG-based unit test g"
+    }
+  ],
+  "equations": [],
+  "algorithms": [],
+  "key_findings": [
+    "Retrieval Augmented Generation (RAG) has advanced software engineering tasks but remains underexplored in unit test generation",
+    "To bridge this gap, we investigate the efficacy of RAG-based unit test generation for machine learning (ML/DL) APIs and analyze the impact of different knowledge sources on their effectiveness."
+  ],
+  "limitations": [
+    "Evaluated under specific synthetic or benchmark testbeds.",
+    "Requires domain-specific empirical calibration."
+  ],
+  "source_checksum": "2e0c1c0cea943b16a4a17ce220cf35b8abbaefa9d6ee7d850692dabac4b7d4c6"
+}

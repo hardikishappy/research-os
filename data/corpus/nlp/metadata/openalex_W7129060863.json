@@ -1,0 +1,16 @@
+{
+  "paper_id": "openalex_W7129060863",
+  "title": "DRAG: Dual-Channel Retrieval-Augmented Generation for Hybrid-Modal Document Understanding",
+  "authors": [
+    "Zhe Xin",
+    "Shuyuan Xia",
+    "Xin Guo"
+  ],
+  "abstract": "Large Language Models (LLMs) have acquired vast amounts of knowledge during pre-training. However, there are a lot of challenges when it is deployed in real-world applications, such as poor interpretability, hallucinations, and the inability to reference private data. To address these issues, Retrieval-Augmented Generation (RAG) has been proposed. Traditional RAG relying on text-based retrievers often converts documents using Optical Character Recognition (OCR) before retrieval. While testing has revealed that it tends to overlook tables and images contained within the documents. RAG, relying on vision-based retrievers, often loses information on text-dense pages. To address these limitations, we propose DRAG: Dual-channel Retrieval-Augmented Generation for Hybrid-Modal Document Understanding, a novel retrieval paradigm. The DRAG method proposed in this paper primarily comprises two core improvements: first, a parallel dual-channel processing architecture is adopted to separately extract and preserve the visual structural information and deep semantic information of documents, thereby effectively enhancing information integrity; second, a novel dynamic weighted fusion mechanism is proposed to integrate the retrieval results from both channels, enabling precise screening of the most relevant information segments. Empirical results demonstrate that our method achieves Competitive performance across multiple general benchmarks. Furthermore, performance on biomedical datasets (e.g., BioM) specifically highlights its potential in specialized, vertical domains such as elderly care and rehabilitation, where documents are characterized by dense hybrid-modal information.",
+  "year": 2026,
+  "venue": "Electronics",
+  "doi": "https://doi.org/10.3390/electronics15040843",
+  "arxiv_id": null,
+  "url": "https://doi.org/10.3390/electronics15040843",
+  "citation_count": 2
+}

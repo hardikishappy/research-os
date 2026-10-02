@@ -1,0 +1,62 @@
+[
+  {
+    "hypothesis_id": "hyp-3dda7e5fbd",
+    "title": "Adaptive State-Triggered Optimization (gap-f4d9d89417)",
+    "falsifiable_statement": "Under severe communication bandwidth caps (<= 64 bytes/sec) and lossy channel conditions, an adaptive state-triggered velocity threshold mechanism addressing gap-f4d9d89417 reduces total overhead by >= 40% while maintaining convergence within 10% of continuous broadcast baselines.",
+    "baseline_method": "Continuous Fixed-Rate Periodic Broadcast (10 Hz)",
+    "proposed_mechanism": "State-dependent event-triggered consensus: nodes transmit positional and velocity state only when local trajectory divergence ||v_i(t) - v_i(t_last)|| exceeds adaptive threshold delta_v.",
+    "theoretical_rationale": "In dense networks, steady-state coordination creates temporal correlation; broadcasting redundant or near-identical vectors wastes channel capacity without improving local neighborhood estimator accuracy.",
+    "inspired_by_seeds": [
+      {
+        "source_paper_id": "arxiv_2609_40362v1",
+        "paper_title": "Multimodal Flow: Unified Flow Modeling of Language and Vision in Embedding Spaces",
+        "domain": "arXiv preprint",
+        "borrowed_aspect": "We present Multimodal Flow, a fully continuous generative model of language and vision"
+      }
+    ],
+    "target_metric": "comm_bandwidth_bytes_per_sec",
+    "expected_direction": "decrease",
+    "success_threshold": 64.0,
+    "addressed_gap_id": "gap-f4d9d89417"
+  },
+  {
+    "hypothesis_id": "hyp-b85f1fbe59",
+    "title": "Adaptive State-Triggered Optimization (gap-7383716946)",
+    "falsifiable_statement": "Under severe communication bandwidth caps (<= 64 bytes/sec) and lossy channel conditions, an adaptive state-triggered velocity threshold mechanism addressing gap-7383716946 reduces total overhead by >= 40% while maintaining convergence within 10% of continuous broadcast baselines.",
+    "baseline_method": "Continuous Fixed-Rate Periodic Broadcast (10 Hz)",
+    "proposed_mechanism": "State-dependent event-triggered consensus: nodes transmit positional and velocity state only when local trajectory divergence ||v_i(t) - v_i(t_last)|| exceeds adaptive threshold delta_v.",
+    "theoretical_rationale": "In dense networks, steady-state coordination creates temporal correlation; broadcasting redundant or near-identical vectors wastes channel capacity without improving local neighborhood estimator accuracy.",
+    "inspired_by_seeds": [
+      {
+        "source_paper_id": "openalex_W1641498739",
+        "paper_title": "The Multimodal Brain Tumor Image Segmentation Benchmark (BRATS)",
+        "domain": "IEEE Transactions on Medical Imaging",
+        "borrowed_aspect": "In this paper we report the set-up and results of the Multimodal Brain Tumor Image Segmentation Benchmark (BRATS) organized in conjunction with the MICCAI 2012 and 2013 conferences"
+      }
+    ],
+    "target_metric": "comm_bandwidth_bytes_per_sec",
+    "expected_direction": "decrease",
+    "success_threshold": 64.0,
+    "addressed_gap_id": "gap-7383716946"
+  },
+  {
+    "hypothesis_id": "hyp-58b7103352",
+    "title": "Adaptive State-Triggered Optimization (gap-0c84d84293)",
+    "falsifiable_statement": "Under severe communication bandwidth caps (<= 64 bytes/sec) and lossy channel conditions, an adaptive state-triggered velocity threshold mechanism addressing gap-0c84d84293 reduces total overhead by >= 40% while maintaining convergence within 10% of continuous broadcast baselines.",
+    "baseline_method": "Continuous Fixed-Rate Periodic Broadcast (10 Hz)",
+    "proposed_mechanism": "State-dependent event-triggered consensus: nodes transmit positional and velocity state only when local trajectory divergence ||v_i(t) - v_i(t_last)|| exceeds adaptive threshold delta_v.",
+    "theoretical_rationale": "In dense networks, steady-state coordination creates temporal correlation; broadcasting redundant or near-identical vectors wastes channel capacity without improving local neighborhood estimator accuracy.",
+    "inspired_by_seeds": [
+      {
+        "source_paper_id": "openalex_W2099938389",
+        "paper_title": "Wikipedia-based Semantic Interpretation for Natural Language Processing",
+        "domain": "Journal of Artificial Intelligence Research",
+        "borrowed_aspect": "Adequate representation of natural language semantics requires access to vast amounts of common sense and domain-specific world knowledge"
+      }
+    ],
+    "target_metric": "comm_bandwidth_bytes_per_sec",
+    "expected_direction": "decrease",
+    "success_threshold": 64.0,
+    "addressed_gap_id": "gap-0c84d84293"
+  }
+]

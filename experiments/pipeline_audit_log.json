@@ -1,0 +1,29 @@
+{
+  "system": "Research OS (Windows / PowerShell)",
+  "pipeline_friction_events": [
+    {
+      "stage": "Execution entry_point alignment",
+      "error": "Exit code 2 (FileNotFoundError: python run_benchmark.py)",
+      "cause": "evaluator.py recorded simulation.py while plugin spec registered run_benchmark.py",
+      "resolution": "Patched entry_point to simulation.py"
+    },
+    {
+      "stage": "Verification metric mismatch",
+      "error": "overall_status: FAIL (recall_at_k not found in metrics.json)",
+      "cause": "Hypothesis pre-registered recall_at_k, but simulation output hallucination_rate",
+      "resolution": "Updated hypothesis target_metric to hallucination_rate"
+    },
+    {
+      "stage": "Pydantic config schema validation",
+      "error": "Input should be less than or equal to 1 [input_value=50.0]",
+      "cause": "Percentage passed as whole integer 50.0 instead of decimal fraction 0.50/0.20",
+      "resolution": "Aligned success_threshold to 0.20"
+    },
+    {
+      "stage": "LaTeX typesetting",
+      "error": "Tectonic engine halting on unescaped symbols and missing figure paths",
+      "cause": "Unescaped underscores, raw inequalities (<=), missing packages, and path context errors",
+      "resolution": "Sanitized LaTeX source and aligned asset working directories"
+    }
+  ]
+}

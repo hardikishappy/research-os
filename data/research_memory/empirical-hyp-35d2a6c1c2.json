@@ -1,0 +1,79 @@
+{
+  "extraction_id": "ext-eval-744d0933",
+  "paper_id": "empirical-hyp-35d2a6c1c2",
+  "metadata": {
+    "paper_id": "empirical-hyp-35d2a6c1c2",
+    "title": "Empirical Finding: Adaptive State-Triggered Optimization (gap-4e3ad31a7d) [CONFIRMED]",
+    "authors": [
+      "Research OS Execution Sandbox",
+      "Human Gate Reviewer"
+    ],
+    "abstract": "Empirical testing of hypothesis 'Adaptive State-Triggered Optimization (gap-4e3ad31a7d)' across 3 random seeds. Outcome: CONFIRMED. Rationale: Hypothesis CONFIRMED across 3 seeds: Mean observed comm_bandwidth_bytes_per_sec = 60.56 (std_err=0.0) satisfied threshold <= 64.0.",
+    "year": 2026,
+    "venue": "Research OS Closed-Loop Empirical Archive",
+    "doi": null,
+    "arxiv_id": null,
+    "url": "research-os://evaluations/eval-744d0933",
+    "citation_count": 1
+  },
+  "sections": {
+    "Abstract": "Empirical testing of hypothesis 'Adaptive State-Triggered Optimization (gap-4e3ad31a7d)' across 3 random seeds. Outcome: CONFIRMED. Rationale: Hypothesis CONFIRMED across 3 seeds: Mean observed comm_bandwidth_bytes_per_sec = 60.56 (std_err=0.0) satisfied threshold <= 64.0.",
+    "Hypothesis & Proposed Mechanism": "Statement: Under severe communication bandwidth caps (<= 64 bytes/sec) and lossy channel conditions, an adaptive state-triggered velocity threshold mechanism addressing gap-4e3ad31a7d reduces total overhead by >= 40% while maintaining convergence within 10% of continuous broadcast baselines.\nProposed Mechanism: State-dependent event-triggered consensus: nodes transmit positional and velocity state only when local trajectory divergence ||v_i(t) - v_i(t_last)|| exceeds adaptive threshold delta_v.\nTheoretical Rationale: In dense networks, steady-state coordination creates temporal correlation; broadcasting redundant or near-identical vectors wastes channel capacity without improving local neighborhood estimator accuracy.\nBaseline Method: Continuous Fixed-Rate Periodic Broadcast (10 Hz)",
+    "Experimental Protocol": "Spec ID: spec-hyp-35d2a6c1\nSeeds Evaluated: [42, 101, 2024]\nValid Completed Runs: 3/3",
+    "Results & Statistical Evaluation": "Empirical Multi-Seed Observations:\n- **comm_bandwidth_bytes_per_sec**: mean = 60.56 (std_dev = 0.00, std_err = 0.00), target <= 64.0 -> PASS\n- **baseline_bandwidth_bytes_per_sec**: mean = 160.00 (std_dev = 0.00, std_err = 0.00), target >= 0.0 -> PASS\n- **comm_overhead_reduction_pct**: mean = 62.15 (std_dev = 0.00, std_err = 0.00), target >= 0.0 -> PASS\n- **aggregation_time_steps**: mean = 20.00 (std_dev = 0.00, std_err = 0.00), target >= 0.0 -> PASS\n- **aggregation_time_delta_pct**: mean = 3.80 (std_dev = 0.00, std_err = 0.00), target >= 0.0 -> PASS\n- **order_parameter**: mean = 0.77 (std_dev = 0.00, std_err = 0.00), target >= 0.0 -> PASS\n- **message_drop_rate**: mean = 0.20 (std_dev = 0.00, std_err = 0.00), target >= 0.0 -> PASS\n- **num_robots**: mean = 50.00 (std_dev = 0.00, std_err = 0.00), target >= 0.0 -> PASS",
+    "Conclusion & Empirical Status": "Hypothesis Status: CONFIRMED\nScientific Verdict: Hypothesis CONFIRMED across 3 seeds: Mean observed comm_bandwidth_bytes_per_sec = 60.56 (std_err=0.0) satisfied threshold <= 64.0."
+  },
+  "section_provenance": [
+    {
+      "source_paper_id": "empirical-hyp-35d2a6c1c2",
+      "section_title": "Abstract",
+      "section_index": 0,
+      "page_start": 1,
+      "page_end": 1,
+      "text_snippet": "Empirical testing of hypothesis 'Adaptive State-Triggered Optimization (gap-4e3ad31a7d)' across 3 random seeds. Outcome: CONFIRMED. Rationale: Hypothesis CONFIRMED across 3 seeds: Mean observed comm_b"
+    },
+    {
+      "source_paper_id": "empirical-hyp-35d2a6c1c2",
+      "section_title": "Hypothesis & Proposed Mechanism",
+      "section_index": 1,
+      "page_start": 1,
+      "page_end": 1,
+      "text_snippet": "Statement: Under severe communication bandwidth caps (<= 64 bytes/sec) and lossy channel conditions, an adaptive state-triggered velocity threshold mechanism addressing gap-4e3ad31a7d reduces total ov"
+    },
+    {
+      "source_paper_id": "empirical-hyp-35d2a6c1c2",
+      "section_title": "Experimental Protocol",
+      "section_index": 2,
+      "page_start": 1,
+      "page_end": 1,
+      "text_snippet": "Spec ID: spec-hyp-35d2a6c1\nSeeds Evaluated: [42, 101, 2024]\nValid Completed Runs: 3/3"
+    },
+    {
+      "source_paper_id": "empirical-hyp-35d2a6c1c2",
+      "section_title": "Results & Statistical Evaluation",
+      "section_index": 3,
+      "page_start": 1,
+      "page_end": 1,
+      "text_snippet": "Empirical Multi-Seed Observations:\n- **comm_bandwidth_bytes_per_sec**: mean = 60.56 (std_dev = 0.00, std_err = 0.00), target <= 64.0 -> PASS\n- **baseline_bandwidth_bytes_per_sec**: mean = 160.00 (std_"
+    },
+    {
+      "source_paper_id": "empirical-hyp-35d2a6c1c2",
+      "section_title": "Conclusion & Empirical Status",
+      "section_index": 4,
+      "page_start": 1,
+      "page_end": 1,
+      "text_snippet": "Hypothesis Status: CONFIRMED\nScientific Verdict: Hypothesis CONFIRMED across 3 seeds: Mean observed comm_bandwidth_bytes_per_sec = 60.56 (std_err=0.0) satisfied threshold <= 64.0."
+    }
+  ],
+  "equations": [],
+  "algorithms": [
+    "Algorithm entry point: python simulation.py --config config.json --output-dir output"
+  ],
+  "key_findings": [
+    "Hypothesis CONFIRMED across 3 seeds: Mean observed comm_bandwidth_bytes_per_sec = 60.56 (std_err=0.0) satisfied threshold <= 64.0."
+  ],
+  "limitations": [
+    "Evaluated across 3 random simulation seeds."
+  ],
+  "source_checksum": "ffa42b7e1656a6a1e8171b46e1cb5d0da1cd101d61332ed3e33cb93356ca6cd5"
+}

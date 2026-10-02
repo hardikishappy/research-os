@@ -1,0 +1,22 @@
+[
+  {
+    "hypothesis_id": "hyp-nlp-retrieval-opt-01",
+    "title": "RAG Retrieval Augmentation Hallucination Mitigation",
+    "falsifiable_statement": "RAG grounding reduces factual hallucination by at least 50% relative to ungrounded generation across multi-seed evaluations.",
+    "baseline_method": "Direct Generation without Retrieval",
+    "proposed_mechanism": "Dense Context Retrieval Augmentation",
+    "theoretical_rationale": "Grounding queries in factual context passages constraints generative attention to reference tokens.",
+    "inspired_by_seeds": [
+      {
+        "source_paper_id": "arxiv_2609_40362v1",
+        "paper_title": "Multimodal Flow: Unified Flow Modeling of Language and Vision",
+        "domain": "nlp",
+        "borrowed_aspect": "Grounded context conditioning"
+      }
+    ],
+    "target_metric": "hallucination_rate",
+    "expected_direction": "decrease",
+    "success_threshold": 0.2,
+    "addressed_gap_id": "gap-nlp-01"
+  }
+]

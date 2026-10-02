@@ -1,0 +1,56 @@
+[
+  {
+    "gap_id": "gap-f4d9d89417",
+    "description": "No close match was identified in the searched sources addressing evaluated under specific synthetic or benchmark testbeds.",
+    "evidence_paper_ids": [
+      "arxiv_2609_40362v1"
+    ],
+    "evidence_citations": [
+      {
+        "source_paper_id": "arxiv_2609_40362v1",
+        "section_title": "Abstract",
+        "section_index": 0,
+        "page_start": null,
+        "page_end": null,
+        "text_snippet": "We present Multimodal Flow, a fully continuous generative model of language and vision. Most unified multimodal models either model both language and quantized images as discrete tokens or combine dis"
+      }
+    ],
+    "impact_potential": "Resolves a critical performance and scalability bottleneck documented in Multimodal Flow: Unified Flow Modeling of Language and Vision in Embedding Spaces."
+  },
+  {
+    "gap_id": "gap-7383716946",
+    "description": "No close match was identified in the searched sources addressing evaluated under specific synthetic or benchmark testbeds.",
+    "evidence_paper_ids": [
+      "openalex_W1641498739"
+    ],
+    "evidence_citations": [
+      {
+        "source_paper_id": "openalex_W1641498739",
+        "section_title": "Abstract",
+        "section_index": 0,
+        "page_start": null,
+        "page_end": null,
+        "text_snippet": "In this paper we report the set-up and results of the Multimodal Brain Tumor Image Segmentation Benchmark (BRATS) organized in conjunction with the MICCAI 2012 and 2013 conferences. Twenty state-of-th"
+      }
+    ],
+    "impact_potential": "Resolves a critical performance and scalability bottleneck documented in The Multimodal Brain Tumor Image Segmentation Benchmark (BRATS)."
+  },
+  {
+    "gap_id": "gap-0c84d84293",
+    "description": "No close match was identified in the searched sources addressing evaluated under specific synthetic or benchmark testbeds.",
+    "evidence_paper_ids": [
+      "openalex_W2099938389"
+    ],
+    "evidence_citations": [
+      {
+        "source_paper_id": "openalex_W2099938389",
+        "section_title": "Abstract",
+        "section_index": 0,
+        "page_start": null,
+        "page_end": null,
+        "text_snippet": "Adequate representation of natural language semantics requires access to vast amounts of common sense and domain-specific world knowledge. Prior work in the field was based on purely statistical techn"
+      }
+    ],
+    "impact_potential": "Resolves a critical performance and scalability bottleneck documented in Wikipedia-based Semantic Interpretation for Natural Language Processing."
+  }
+]

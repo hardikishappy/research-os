@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "research-os"
+version = "0.1.0"
+description = "Human-gated AI Research Operating System turning literature into verified research experiments with strict reproducibility and auditable provenance."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "Research OS Team" }
+]
+dependencies = [
+    "pydantic>=2.0.0",
+    "pyyaml>=6.0",
+    "portalocker>=2.8.0",
+    "pypdf>=4.0.0",
+    "psutil>=5.9.0",
+    "scipy>=1.10.0",
+]
+
+[project.scripts]
+research-os = "research_os.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.20.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

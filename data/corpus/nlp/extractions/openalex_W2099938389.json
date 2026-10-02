@@ -1,0 +1,45 @@
+{
+  "extraction_id": "ext_openalex_W2099938389",
+  "paper_id": "openalex_W2099938389",
+  "metadata": {
+    "paper_id": "openalex_W2099938389",
+    "title": "Wikipedia-based Semantic Interpretation for Natural Language Processing",
+    "authors": [
+      "Evgeniy Gabrilovich",
+      "Shaul Markovitch"
+    ],
+    "abstract": "Adequate representation of natural language semantics requires access to vast amounts of common sense and domain-specific world knowledge. Prior work in the field was based on purely statistical techniques that did not make use of background knowledge, on limited lexicographic knowledge bases such as WordNet, or on huge manual efforts such as the CYC project. Here we propose a novel method, called Explicit Semantic Analysis (ESA), for fine-grained semantic interpretation of unrestricted natural language texts. Our method represents meaning in a high-dimensional space of concepts derived from Wikipedia, the largest encyclopedia in existence. We explicitly represent the meaning of any text in terms of Wikipedia-based concepts. We evaluate the effectiveness of our method on text categorization and on computing the degree of semantic relatedness between fragments of natural language text. Using ESA results in significant improvements over the previous state of the art in both tasks. Importantly, due to the use of natural concepts, the ESA model is easy to explain to human users.",
+    "year": 2009,
+    "venue": "Journal of Artificial Intelligence Research",
+    "doi": "https://doi.org/10.1613/jair.2669",
+    "arxiv_id": null,
+    "url": "https://doi.org/10.1613/jair.2669",
+    "citation_count": 380
+  },
+  "sections": {
+    "Abstract": "Adequate representation of natural language semantics requires access to vast amounts of common sense and domain-specific world knowledge. Prior work in the field was based on purely statistical techniques that did not make use of background knowledge, on limited lexicographic knowledge bases such as WordNet, or on huge manual efforts such as the CYC project. Here we propose a novel method, called Explicit Semantic Analysis (ESA), for fine-grained semantic interpretation of unrestricted natural language texts. Our method represents meaning in a high-dimensional space of concepts derived from Wikipedia, the largest encyclopedia in existence. We explicitly represent the meaning of any text in terms of Wikipedia-based concepts. We evaluate the effectiveness of our method on text categorization and on computing the degree of semantic relatedness between fragments of natural language text. Using ESA results in significant improvements over the previous state of the art in both tasks. Importantly, due to the use of natural concepts, the ESA model is easy to explain to human users.",
+    "Introduction": "This study explores Wikipedia-based Semantic Interpretation for Natural Language Processing."
+  },
+  "section_provenance": [
+    {
+      "source_paper_id": "openalex_W2099938389",
+      "section_title": "Abstract",
+      "section_index": 0,
+      "page_start": null,
+      "page_end": null,
+      "text_snippet": "Adequate representation of natural language semantics requires access to vast amounts of common sense and domain-specific world knowledge. Prior work in the field was based on purely statistical techn"
+    }
+  ],
+  "equations": [],
+  "algorithms": [],
+  "key_findings": [
+    "Adequate representation of natural language semantics requires access to vast amounts of common sense and domain-specific world knowledge",
+    "Prior work in the field was based on purely statistical techniques that did not make use of background knowledge, on limited lexicographic knowledge bases such as WordNet, or on huge manual efforts such as the CYC project",
+    "Here we propose a novel method, called Explicit Semantic Analysis (ESA), for fine-grained semantic interpretation of unrestricted natural language texts"
+  ],
+  "limitations": [
+    "Evaluated under specific synthetic or benchmark testbeds.",
+    "Requires domain-specific empirical calibration."
+  ],
+  "source_checksum": "ac12386cdbfee46846495d4b9163b8ee79edb89e3b75647436499c2d813dfb21"
+}

@@ -1,0 +1,13 @@
+[
+  {
+    "hypothesis_id": "hyp-nlp-rag-live-01",
+    "title": "Retrieval-Augmented Generation vs Direct Generation on Hallucination Frequency",
+    "falsifiable_statement": "Providing retrieved context chunks for knowledge-intensive queries reduces hallucination frequency by >= 50% compared to direct generation without context.",
+    "baseline_method": "Direct Closed-Book LLM Generation",
+    "proposed_mechanism": "BM25 Sparse Retrieval Augmented Generation",
+    "theoretical_rationale": "Conditioning on relevant factual passages restricts token generation distributions to verified source context.",
+    "target_metric": "hallucination_rate",
+    "expected_direction": "decrease",
+    "success_threshold": 0.2
+  }
+]

@@ -1,0 +1,192 @@
+{
+  "matrix_id": "matrix-empirical-01",
+  "domain": "Empirical Research",
+  "rows": [
+    {
+      "paper_id": "arxiv_2609_40362v1",
+      "title": "Multimodal Flow: Unified Flow Modeling of Language and Vision in Embedding Spaces",
+      "year": 2026,
+      "primary_method": "Retrieval-Augmented Generation",
+      "evaluation_scale": "N=Standard Evaluation Set",
+      "operational_constraints": "Nominal Channel Baseline",
+      "noise_modeled": "Ideal Sensing (Zero Noise)",
+      "evaluation_platform": "Custom Python Testbed",
+      "primary_metrics": [
+        "task_completion_rate",
+        "runtime_overhead"
+      ],
+      "baseline_methods": [
+        "Standard Static Baseline"
+      ]
+    },
+    {
+      "paper_id": "openalex_W1641498739",
+      "title": "The Multimodal Brain Tumor Image Segmentation Benchmark (BRATS)",
+      "year": 2014,
+      "primary_method": "Empirical Computational Model",
+      "evaluation_scale": "N=Standard Evaluation Set",
+      "operational_constraints": "Nominal Channel Baseline",
+      "noise_modeled": "Ideal Sensing (Zero Noise)",
+      "evaluation_platform": "Standardized Benchmark",
+      "primary_metrics": [
+        "task_completion_rate",
+        "runtime_overhead"
+      ],
+      "baseline_methods": [
+        "Standard Static Baseline"
+      ]
+    },
+    {
+      "paper_id": "openalex_W2099938389",
+      "title": "Wikipedia-based Semantic Interpretation for Natural Language Processing",
+      "year": 2009,
+      "primary_method": "Retrieval-Augmented Generation",
+      "evaluation_scale": "N=Standard Evaluation Set",
+      "operational_constraints": "Nominal Channel Baseline",
+      "noise_modeled": "Ideal Sensing (Zero Noise)",
+      "evaluation_platform": "Custom Python Testbed",
+      "primary_metrics": [
+        "task_completion_rate",
+        "runtime_overhead"
+      ],
+      "baseline_methods": [
+        "Standard Static Baseline"
+      ]
+    },
+    {
+      "paper_id": "openalex_W4403747681",
+      "title": "Retrieval-Augmented Test Generation: How Far Are We?",
+      "year": 2026,
+      "primary_method": "Retrieval-Augmented Generation",
+      "evaluation_scale": "N=Standard Evaluation Set",
+      "operational_constraints": "Nominal Channel Baseline",
+      "noise_modeled": "Ideal Sensing (Zero Noise)",
+      "evaluation_platform": "Custom Python Testbed",
+      "primary_metrics": [
+        "task_completion_rate",
+        "runtime_overhead"
+      ],
+      "baseline_methods": [
+        "Standard Static Baseline"
+      ]
+    },
+    {
+      "paper_id": "openalex_W7129060863",
+      "title": "DRAG: Dual-Channel Retrieval-Augmented Generation for Hybrid-Modal Document Understanding",
+      "year": 2026,
+      "primary_method": "Retrieval-Augmented Generation",
+      "evaluation_scale": "N=Standard Evaluation Set",
+      "operational_constraints": "Nominal Channel Baseline",
+      "noise_modeled": "Adversarial Noise / Distractors",
+      "evaluation_platform": "Custom Python Testbed",
+      "primary_metrics": [
+        "accuracy_metric"
+      ],
+      "baseline_methods": [
+        "Standard Static Baseline"
+      ]
+    },
+    {
+      "paper_id": "paper-0c0d09512bb7",
+      "title": "Corpus Manifest",
+      "year": null,
+      "primary_method": "Empirical Computational Model",
+      "evaluation_scale": "N=Standard Evaluation Set",
+      "operational_constraints": "Nominal Channel Baseline",
+      "noise_modeled": "Ideal Sensing (Zero Noise)",
+      "evaluation_platform": "Custom Python Testbed",
+      "primary_metrics": [
+        "task_completion_rate",
+        "runtime_overhead"
+      ],
+      "baseline_methods": [
+        "Standard Static Baseline"
+      ]
+    },
+    {
+      "paper_id": "paper-3596fe035e2b",
+      "title": "Openalex W1641498739",
+      "year": null,
+      "primary_method": "Empirical Computational Model",
+      "evaluation_scale": "N=Standard Evaluation Set",
+      "operational_constraints": "Nominal Channel Baseline",
+      "noise_modeled": "Ideal Sensing (Zero Noise)",
+      "evaluation_platform": "Custom Python Testbed",
+      "primary_metrics": [
+        "task_completion_rate",
+        "runtime_overhead"
+      ],
+      "baseline_methods": [
+        "Standard Static Baseline"
+      ]
+    },
+    {
+      "paper_id": "paper-3d1066cd5d3e",
+      "title": "Openalex W7129060863",
+      "year": null,
+      "primary_method": "Empirical Computational Model",
+      "evaluation_scale": "N=Standard Evaluation Set",
+      "operational_constraints": "Nominal Channel Baseline",
+      "noise_modeled": "Ideal Sensing (Zero Noise)",
+      "evaluation_platform": "Custom Python Testbed",
+      "primary_metrics": [
+        "task_completion_rate",
+        "runtime_overhead"
+      ],
+      "baseline_methods": [
+        "Standard Static Baseline"
+      ]
+    },
+    {
+      "paper_id": "paper-43698553dfb2",
+      "title": "Openalex W2099938389",
+      "year": null,
+      "primary_method": "Empirical Computational Model",
+      "evaluation_scale": "N=Standard Evaluation Set",
+      "operational_constraints": "Nominal Channel Baseline",
+      "noise_modeled": "Ideal Sensing (Zero Noise)",
+      "evaluation_platform": "Custom Python Testbed",
+      "primary_metrics": [
+        "task_completion_rate",
+        "runtime_overhead"
+      ],
+      "baseline_methods": [
+        "Standard Static Baseline"
+      ]
+    },
+    {
+      "paper_id": "paper-57bf978ce78e",
+      "title": "Arxiv 2609 40362V1",
+      "year": null,
+      "primary_method": "Empirical Computational Model",
+      "evaluation_scale": "N=Standard Evaluation Set",
+      "operational_constraints": "Nominal Channel Baseline",
+      "noise_modeled": "Ideal Sensing (Zero Noise)",
+      "evaluation_platform": "Custom Python Testbed",
+      "primary_metrics": [
+        "task_completion_rate",
+        "runtime_overhead"
+      ],
+      "baseline_methods": [
+        "Standard Static Baseline"
+      ]
+    },
+    {
+      "paper_id": "paper-b7a277190c95",
+      "title": "Openalex W4403747681",
+      "year": null,
+      "primary_method": "Empirical Computational Model",
+      "evaluation_scale": "N=Standard Evaluation Set",
+      "operational_constraints": "Nominal Channel Baseline",
+      "noise_modeled": "Ideal Sensing (Zero Noise)",
+      "evaluation_platform": "Custom Python Testbed",
+      "primary_metrics": [
+        "task_completion_rate",
+        "runtime_overhead"
+      ],
+      "baseline_methods": [
+        "Standard Static Baseline"
+      ]
+    }
+  ]
+}

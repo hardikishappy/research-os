@@ -1,0 +1,16 @@
+references/
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+dist/
+build/
+experiments/runs/
+scratch/
+scratch_out/
+temp_test_manuscript/
+tectonic.exe
+FINAL_AUDIT_BUNDLE.txt
+FULL_AUDIT_BUNDLE.txt
+.env
+.gate_nonces.json

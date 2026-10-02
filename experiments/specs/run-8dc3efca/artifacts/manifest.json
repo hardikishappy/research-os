@@ -1,0 +1,18 @@
+{
+  "run_id": "run-8dc3efca",
+  "timestamp": "2026-10-01T19:25:01.382751+00:00",
+  "topic": "Adaptive Retrieval Context Optimization",
+  "provider": "mock",
+  "corpus_dir": "data/corpus/nlp",
+  "paper_count": 11,
+  "gap_count": 3,
+  "hypothesis_count": 3,
+  "artifacts": {
+    "capability_matrix.json": "fe4c569c602b023a4bd594cfac2df318ef8a77d5e294f9a73cc4ae00341f15c2",
+    "capability_matrix.md": "228a0fc9fe8f392a07257a52d04b0be81b9f03a82e553c2982b8cfa5ad7b0c79",
+    "gaps.json": "54195fa59bcfbaa719cc920d7d53e10cda620ec8971c946e1ef047855e1fe722",
+    "hypotheses.json": "a7a3f23e70922ae7d7965e84ee1eecc3c95b25b79c74a034b045afdcc8f477ff",
+    "synthesis.json": "1bf911687c576af59567b7249b4811c1308ef71c0c93f238d5c110abcc13d4a6"
+  },
+  "status": "COMPLETED"
+}
